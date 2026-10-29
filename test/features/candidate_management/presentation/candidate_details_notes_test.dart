@@ -10,10 +10,38 @@ import 'package:people/l10n/app_localizations.dart';
 class _Repository implements CandidateRepository {
   _Repository(this.data);
 
-  final RecruitingData data;
+  RecruitingData data;
 
   @override
   Future<RecruitingData> load() async => data;
+
+  @override
+  Future<void> saveInterviewFeedback(
+    String candidateId, {
+    required String stageId,
+    required FeedbackDecision decision,
+    required String notes,
+  }) async {
+    final candidate = data.candidates.single;
+    final previous = candidate.latestFeedbackFor(stageId)!;
+    data = RecruitingData(
+      candidates: [
+        candidate.copyWith(
+          interviews: [
+            InterviewRecord(
+              id: previous.id,
+              stageId: stageId,
+              createdAt: previous.createdAt,
+              decision: decision,
+              notes: notes,
+            ),
+          ],
+        ),
+      ],
+      sources: data.sources,
+      stages: data.stages,
+    );
+  }
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
@@ -33,8 +61,51 @@ void main() {
       expect(field, findsOneWidget);
       await tester.enterText(field, 'Edited notes.');
       expect(find.text('Edited notes.'), findsOneWidget);
+      await tester.tap(find.text('Save feedback'));
+      await tester.pumpAndSettle();
+      expect(find.text('Edited notes.'), findsOneWidget);
+      await tester.tap(find.text('Edited notes.'));
+      await tester.pumpAndSettle();
+      expect(find.widgetWithText(TextField, 'Edited notes.'), findsOneWidget);
     });
   }
+
+  testWidgets('closing dirty feedback requires confirmation', (tester) async {
+    await _pumpDetails(tester, const Size(1100, 700));
+    await tester.tap(find.text('Strong systems thinking.'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Strong systems thinking.'),
+      'Unsaved notes.',
+    );
+    await tester.tap(find.byIcon(Icons.close).last);
+    await tester.pumpAndSettle();
+    expect(find.text('Unsaved changes'), findsOneWidget);
+    await tester.tap(find.text('Keep editing'));
+    await tester.pumpAndSettle();
+    expect(find.widgetWithText(TextField, 'Unsaved notes.'), findsOneWidget);
+    await tester.tap(find.byIcon(Icons.close).last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Discard changes'));
+    await tester.pumpAndSettle();
+    expect(find.widgetWithText(TextField, 'Unsaved notes.'), findsNothing);
+    expect(find.text('Strong systems thinking.'), findsOneWidget);
+  });
+
+  testWidgets('feedback actions remain reachable in a small window', (
+    tester,
+  ) async {
+    await _pumpDetails(tester, const Size(1100, 700));
+    await tester.tap(find.text('Strong systems thinking.'));
+    await tester.pumpAndSettle();
+    tester.view.physicalSize = const Size(600, 440);
+    await tester.pumpAndSettle();
+    final save = find.text('Save feedback');
+    await tester.ensureVisible(save);
+    await tester.pumpAndSettle();
+    expect(save.hitTestable(), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 }
 
 Future<void> _pumpDetails(WidgetTester tester, Size size) async {

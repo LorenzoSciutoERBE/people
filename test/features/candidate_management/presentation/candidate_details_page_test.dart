@@ -85,8 +85,45 @@ void main() {
     expect(find.byType(Dialog), findsOneWidget);
     final firstName = find.byType(TextField).first;
     await tester.enterText(firstName, 'Grace');
+    await tester.pump();
     await tester.tap(find.text('Save candidate'));
     await tester.pumpAndSettle();
     expect(repository.data.candidates.single.firstName, 'Grace');
+
+    await tester.enterText(firstName, '');
+    await tester.pump();
+    await tester.tap(find.text('Save candidate'));
+    await tester.pumpAndSettle();
+    expect(find.text('Enter at least a first name.'), findsOneWidget);
+    expect(repository.data.candidates.single.firstName, 'Grace');
+
+    await tester.enterText(firstName, 'Grace');
+    final experience = find.byWidgetPredicate(
+      (widget) =>
+          widget is TextField &&
+          widget.decoration?.labelText == 'Years of experience',
+    );
+    await tester.ensureVisible(experience);
+    await tester.enterText(experience, '-2');
+    await tester.pump();
+    await tester.tap(find.text('Save candidate'));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Enter a whole number of years, zero or greater.'),
+      findsOneWidget,
+    );
+    expect(repository.data.candidates.single.yearsOfExperience, isNull);
+
+    await tester.tap(find.byIcon(Icons.close));
+    await tester.pumpAndSettle();
+    expect(find.text('Unsaved changes'), findsOneWidget);
+    await tester.tap(find.text('Keep editing'));
+    await tester.pumpAndSettle();
+    expect(find.byType(Dialog), findsOneWidget);
+    await tester.tap(find.byIcon(Icons.close));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Discard changes'));
+    await tester.pumpAndSettle();
+    expect(find.byType(Dialog), findsNothing);
   });
 }

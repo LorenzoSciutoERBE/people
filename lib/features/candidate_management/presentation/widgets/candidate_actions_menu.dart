@@ -6,7 +6,7 @@ import '../../domain/entities/recruiting_data.dart';
 import '../providers/candidate_management_providers.dart';
 import 'candidate_dialog_support.dart';
 import 'candidate_editor_dialog.dart';
-import 'candidate_details_page.dart';
+import 'interview_feedback_form.dart';
 import 'offer_dialog.dart';
 
 /// Overflow menu with the edit, feedback, offer and delete actions of a
@@ -27,10 +27,15 @@ class CandidateActionsMenu extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final localization = AppLocalizations.of(context);
     return PopupMenuButton<String>(
-      tooltip: localization.candidateEdit,
+      tooltip: localization.candidateActions,
       onSelected: (value) => _handle(context, ref, value),
       itemBuilder: (context) => [
         PopupMenuItem(value: 'edit', child: Text(localization.candidateEdit)),
+        if (stage.terminalOutcome == TerminalOutcome.active)
+          PopupMenuItem(
+            value: 'move',
+            child: Text(localization.candidateMoveToStage),
+          ),
         if (feedbackEnabled)
           PopupMenuItem(
             value: 'feedback',
@@ -68,10 +73,65 @@ class CandidateActionsMenu extends ConsumerWidget {
               CandidateEditorDialog(data: data, candidate: candidate),
         );
       case 'feedback':
-        await CandidateDetailsPage.open(
+        await showDialog<bool>(
+          context: context,
+          barrierDismissible: false,
+          builder: (_) => InterviewFeedbackDialog(
+            candidate: candidate,
+            stage: stage,
+            existing: candidate.latestFeedbackFor(stage.id),
+          ),
+        );
+      case 'move':
+        final data = ref
+            .read(candidateManagementControllerProvider)
+            .asData
+            ?.value;
+        if (data == null) return;
+        final active =
+            data.stages
+                .where(
+                  (stage) => stage.terminalOutcome == TerminalOutcome.active,
+                )
+                .toList()
+              ..sort((first, second) => first.order.compareTo(second.order));
+        final current = active.indexWhere(
+          (stage) => stage.id == candidate.stageId,
+        );
+        final next = current >= 0 && current + 1 < active.length
+            ? active[current + 1]
+            : null;
+        final destinations =
+            data.stages
+                .where(
+                  (destination) =>
+                      destination.id == next?.id ||
+                      destination.terminalOutcome == TerminalOutcome.rejected ||
+                      (stage.isOfferStage &&
+                          destination.terminalOutcome == TerminalOutcome.hired),
+                )
+                .toList()
+              ..sort((first, second) => first.order.compareTo(second.order));
+        final destination = await showDialog<HiringStage>(
+          context: context,
+          builder: (context) => SimpleDialog(
+            title: Text(localization.candidateMoveToStage),
+            children: [
+              for (final destination in destinations)
+                SimpleDialogOption(
+                  onPressed: () => Navigator.pop(context, destination),
+                  child: Text(localizedStageName(localization, destination)),
+                ),
+            ],
+          ),
+        );
+        if (destination == null || !context.mounted) return;
+        await performCandidateAction(
           context,
-          candidate.id,
-          startWithFeedback: true,
+          localization,
+          () => ref
+              .read(candidateManagementControllerProvider.notifier)
+              .moveCandidate(candidate.id, destination.id),
         );
       case 'offer':
         await showDialog<void>(

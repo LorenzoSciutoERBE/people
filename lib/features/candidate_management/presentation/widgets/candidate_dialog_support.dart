@@ -4,6 +4,28 @@ import '../../../../l10n/app_localizations.dart';
 import '../../domain/entities/recruiting_data.dart';
 import '../../domain/failures/candidate_repository_exception.dart';
 
+Future<bool> confirmDiscardChanges(BuildContext context) async {
+  final localization = AppLocalizations.of(context);
+  return await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text(localization.unsavedChangesTitle),
+          content: Text(localization.unsavedChangesMessage),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: Text(localization.keepEditing),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: Text(localization.discardChanges),
+            ),
+          ],
+        ),
+      ) ??
+      false;
+}
+
 class CandidateErrorPanel extends StatelessWidget {
   const CandidateErrorPanel({
     required this.message,
@@ -40,9 +62,10 @@ Future<void> performCandidateAction(
   } on CandidateRepositoryException catch (error) {
     if (!context.mounted) return;
     final message = switch (error.code) {
-      'positive_feedback_required' => localization.candidateMoveBlocked,
-      'negative_feedback_required' => localization.candidateMoveBlocked,
-      'accepted_offer_required' => localization.candidateMoveBlocked,
+      'positive_feedback_required' => localization.candidateMoveForwardBlocked,
+      'negative_feedback_required' => localization.candidateRejectBlocked,
+      'accepted_offer_required' => localization.candidateHireBlocked,
+      'invalid_stage_transition' => localization.candidateTransitionBlocked,
       _ => localization.candidateActionFailed,
     };
     ScaffoldMessenger.of(context)

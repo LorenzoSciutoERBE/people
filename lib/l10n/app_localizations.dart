@@ -104,6 +104,66 @@ abstract class AppLocalizations {
   /// **'People'**
   String get appTitle;
 
+  /// No description provided for @unsavedChangesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Unsaved changes'**
+  String get unsavedChangesTitle;
+
+  /// No description provided for @unsavedChangesMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Your changes have not been saved. Discard them?'**
+  String get unsavedChangesMessage;
+
+  /// No description provided for @keepEditing.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep editing'**
+  String get keepEditing;
+
+  /// No description provided for @discardChanges.
+  ///
+  /// In en, this message translates to:
+  /// **'Discard changes'**
+  String get discardChanges;
+
+  /// No description provided for @candidateActions.
+  ///
+  /// In en, this message translates to:
+  /// **'Candidate actions'**
+  String get candidateActions;
+
+  /// No description provided for @candidateMoveToStage.
+  ///
+  /// In en, this message translates to:
+  /// **'Move to stage'**
+  String get candidateMoveToStage;
+
+  /// No description provided for @candidateMoveForwardBlocked.
+  ///
+  /// In en, this message translates to:
+  /// **'Record a positive or neutral decision for the current stage before continuing.'**
+  String get candidateMoveForwardBlocked;
+
+  /// No description provided for @candidateRejectBlocked.
+  ///
+  /// In en, this message translates to:
+  /// **'Record a negative or neutral decision for the current stage before rejecting this candidate.'**
+  String get candidateRejectBlocked;
+
+  /// No description provided for @candidateHireBlocked.
+  ///
+  /// In en, this message translates to:
+  /// **'Hiring requires the offer stage, an accepted offer and a positive decision.'**
+  String get candidateHireBlocked;
+
+  /// No description provided for @candidateTransitionBlocked.
+  ///
+  /// In en, this message translates to:
+  /// **'Move to the next active stage, or choose a final outcome.'**
+  String get candidateTransitionBlocked;
+
   /// No description provided for @companyLogoLabel.
   ///
   /// In en, this message translates to:
@@ -511,6 +571,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Years of experience'**
   String get candidateExperience;
+
+  /// No description provided for @candidateExperienceInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a whole number of years, zero or greater.'**
+  String get candidateExperienceInvalid;
 
   /// No description provided for @candidateSource.
   ///

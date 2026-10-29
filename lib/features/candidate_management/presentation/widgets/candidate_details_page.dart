@@ -59,7 +59,7 @@ class CandidateDetailsPage extends ConsumerWidget {
             _DialogHeader(
               candidate: candidate,
               stage: stage,
-              onClose: () => Navigator.of(context).pop(),
+              onClose: () => Navigator.of(context).maybePop(),
             ),
             const Divider(height: 1),
             Expanded(
@@ -363,6 +363,54 @@ class _InlineProfileState extends ConsumerState<_InlineProfile> {
   late final TextEditingController _linkedin;
   late String _sourceId;
   bool _saving = false;
+  String? _firstNameError;
+  String? _experienceError;
+  final _firstNameKey = GlobalKey();
+  final _experienceKey = GlobalKey();
+  late List<String> _savedValues;
+  bool _allowClose = false;
+  bool _confirmingClose = false;
+
+  List<TextEditingController> get _controllers => [
+    _firstName,
+    _lastName,
+    _email,
+    _phone,
+    _location,
+    _headline,
+    _skills,
+    _experience,
+    _github,
+    _linkedin,
+  ];
+
+  List<String> get _values => [
+    for (final controller in _controllers) controller.text,
+    _sourceId,
+  ];
+
+  bool get _dirty {
+    final values = _values;
+    for (var index = 0; index < values.length; index++) {
+      if (values[index] != _savedValues[index]) return true;
+    }
+    return false;
+  }
+
+  void _onProfileChanged() => setState(() {});
+
+  Future<void> _requestClose() async {
+    if (_saving || _confirmingClose) return;
+    if (_dirty) {
+      _confirmingClose = true;
+      final discard = await confirmDiscardChanges(context);
+      _confirmingClose = false;
+      if (!discard || !mounted) return;
+    }
+    setState(() => _allowClose = true);
+    await WidgetsBinding.instance.endOfFrame;
+    if (mounted) Navigator.of(context).pop();
+  }
 
   @override
   void initState() {
@@ -381,6 +429,10 @@ class _InlineProfileState extends ConsumerState<_InlineProfile> {
     _github = TextEditingController(text: candidate.githubUrl);
     _linkedin = TextEditingController(text: candidate.linkedinUrl);
     _sourceId = candidate.sourceId;
+    _savedValues = _values;
+    for (final controller in _controllers) {
+      controller.addListener(_onProfileChanged);
+    }
   }
 
   @override
@@ -405,36 +457,50 @@ class _InlineProfileState extends ConsumerState<_InlineProfile> {
       for (final source in widget.data.sources)
         source.id: localizedSourceName(localization, source),
     };
-    return Card(
-      margin: EdgeInsets.zero,
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          children: [
-            _actions(localization),
-            const SizedBox(height: 16),
-            Expanded(
-              child: ListView(
-                children: [
-                  _field(_firstName, localization.candidateFirstName),
-                  _field(_lastName, localization.candidateLastName),
-                  _field(_email, localization.candidateEmail),
-                  _field(_phone, localization.candidatePhone),
-                  _field(_location, localization.candidateLocation),
-                  _field(_headline, localization.candidateHeadline),
-                  _field(_skills, localization.candidateSkills, maxLines: 2),
-                  _field(
-                    _experience,
-                    localization.candidateExperience,
-                    keyboardType: TextInputType.number,
+    return PopScope<void>(
+      canPop: _allowClose || (!_dirty && !_saving),
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) _requestClose();
+      },
+      child: Card(
+        margin: EdgeInsets.zero,
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            children: [
+              _actions(localization),
+              const SizedBox(height: 16),
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _field(_firstName, localization.candidateFirstName),
+                      _field(_lastName, localization.candidateLastName),
+                      _field(_email, localization.candidateEmail),
+                      _field(_phone, localization.candidatePhone),
+                      _field(_location, localization.candidateLocation),
+                      _field(_headline, localization.candidateHeadline),
+                      _field(
+                        _skills,
+                        localization.candidateSkills,
+                        maxLines: 2,
+                      ),
+                      _field(
+                        _experience,
+                        localization.candidateExperience,
+                        keyboardType: TextInputType.number,
+                      ),
+                      _sourceField(sources, localization),
+                      _field(_github, localization.candidateGithubUrl),
+                      _field(_linkedin, localization.candidateLinkedinUrl),
+                    ],
                   ),
-                  _sourceField(sources, localization),
-                  _field(_github, localization.candidateGithubUrl),
-                  _field(_linkedin, localization.candidateLinkedinUrl),
-                ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -446,7 +512,7 @@ class _InlineProfileState extends ConsumerState<_InlineProfile> {
     crossAxisAlignment: WrapCrossAlignment.center,
     children: [
       FilledButton.icon(
-        onPressed: _saving ? null : _save,
+        onPressed: _saving || !_dirty ? null : _save,
         icon: _saving
             ? const SizedBox(
                 width: 18,
@@ -514,12 +580,33 @@ class _InlineProfileState extends ConsumerState<_InlineProfile> {
     int maxLines = 1,
     TextInputType? keyboardType,
   }) => Padding(
+    key: controller == _firstName
+        ? _firstNameKey
+        : controller == _experience
+        ? _experienceKey
+        : null,
     padding: const EdgeInsets.only(bottom: 12),
     child: TextField(
       controller: controller,
+      readOnly: _saving,
       maxLines: maxLines,
       keyboardType: keyboardType,
-      decoration: InputDecoration(labelText: label),
+      onChanged: (_) {
+        if (controller == _firstName && _firstNameError != null) {
+          setState(() => _firstNameError = null);
+        }
+        if (controller == _experience && _experienceError != null) {
+          setState(() => _experienceError = null);
+        }
+      },
+      decoration: InputDecoration(
+        labelText: label,
+        errorText: controller == _firstName
+            ? _firstNameError
+            : controller == _experience
+            ? _experienceError
+            : null,
+      ),
     ),
   );
 
@@ -527,8 +614,27 @@ class _InlineProfileState extends ConsumerState<_InlineProfile> {
     final localization = AppLocalizations.of(context);
     final experienceText = _experience.text.trim();
     final experience = int.tryParse(experienceText);
-    if (experienceText.isNotEmpty && experience == null) {
-      showCandidateActionError(context);
+    setState(() {
+      _firstNameError = _firstName.text.trim().isEmpty
+          ? localization.candidateNameRequired
+          : null;
+      _experienceError =
+          experienceText.isNotEmpty && (experience == null || experience < 0)
+          ? localization.candidateExperienceInvalid
+          : null;
+    });
+    if (_firstNameError != null || _experienceError != null) {
+      await WidgetsBinding.instance.endOfFrame;
+      if (!mounted) return;
+      final fieldContext =
+          (_firstNameError != null ? _firstNameKey : _experienceKey)
+              .currentContext;
+      if (fieldContext != null && fieldContext.mounted) {
+        await Scrollable.ensureVisible(
+          fieldContext,
+          duration: const Duration(milliseconds: 200),
+        );
+      }
       return;
     }
     setState(() => _saving = true);
@@ -557,6 +663,7 @@ class _InlineProfileState extends ConsumerState<_InlineProfile> {
             ),
           );
       if (mounted) {
+        setState(() => _savedValues = _values);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(localization.candidateProfileSaved)),
         );
@@ -642,6 +749,7 @@ class _InterviewHistoryState extends State<_InterviewHistory> {
   Future<void> _open(HiringStage stage) async {
     final saved = await showDialog<bool>(
       context: context,
+      barrierDismissible: false,
       builder: (_) => InterviewFeedbackDialog(
         candidate: widget.candidate,
         stage: stage,

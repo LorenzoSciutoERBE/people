@@ -13,6 +13,41 @@ class AppLocalizationsIt extends AppLocalizations {
   String get appTitle => 'People';
 
   @override
+  String get unsavedChangesTitle => 'Modifiche non salvate';
+
+  @override
+  String get unsavedChangesMessage =>
+      'Le modifiche non sono state salvate. Vuoi eliminarle?';
+
+  @override
+  String get keepEditing => 'Continua a modificare';
+
+  @override
+  String get discardChanges => 'Elimina modifiche';
+
+  @override
+  String get candidateActions => 'Azioni candidato';
+
+  @override
+  String get candidateMoveToStage => 'Sposta in una fase';
+
+  @override
+  String get candidateMoveForwardBlocked =>
+      'Registra una decisione positiva o neutrale per la fase corrente prima di proseguire.';
+
+  @override
+  String get candidateRejectBlocked =>
+      'Registra una decisione negativa o neutrale per la fase corrente prima di scartare il candidato.';
+
+  @override
+  String get candidateHireBlocked =>
+      'Per assumere servono la fase di offerta, un\'offerta accettata e una decisione positiva.';
+
+  @override
+  String get candidateTransitionBlocked =>
+      'Passa alla fase attiva successiva oppure scegli un esito finale.';
+
+  @override
   String get companyLogoLabel => 'Logo aziendale';
 
   @override
@@ -244,6 +279,10 @@ class AppLocalizationsIt extends AppLocalizations {
 
   @override
   String get candidateExperience => 'Anni di esperienza';
+
+  @override
+  String get candidateExperienceInvalid =>
+      'Inserisci un numero intero di anni, uguale o superiore a zero.';
 
   @override
   String get candidateSource => 'Canale di provenienza';
