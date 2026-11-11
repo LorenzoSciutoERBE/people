@@ -1,6 +1,6 @@
+import 'dart:io';
+
 /// Build-time configuration injected with `--dart-define-from-file=env.json`.
-///
-/// Nothing is hardcoded: missing values are reported by [missingKeys].
 abstract final class AppConfig {
   static const String githubClientId = String.fromEnvironment(
     'GITHUB_CLIENT_ID',
@@ -17,9 +17,13 @@ abstract final class AppConfig {
     defaultValue: 'https://github.com',
   );
 
-  /// Names of the required keys that were not provided at build time.
-  static List<String> get missingKeys => <String>[
-    if (githubClientId.isEmpty) 'GITHUB_CLIENT_ID',
-    if (githubClientSecret.isEmpty) 'GITHUB_CLIENT_SECRET',
-  ];
+  static Uri resolveGitHubApiUri(String baseUrl, String path) =>
+      Uri.parse(baseUrl.endsWith('/') ? baseUrl : '$baseUrl/').resolve(path);
+
+  static Map<String, String> githubApiHeaders(String accessToken) =>
+      <String, String>{
+        HttpHeaders.acceptHeader: 'application/vnd.github+json',
+        HttpHeaders.authorizationHeader: 'Bearer $accessToken',
+        'X-GitHub-Api-Version': '2022-11-28',
+      };
 }

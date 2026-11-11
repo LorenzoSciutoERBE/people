@@ -10,7 +10,7 @@ class ResultsSkeleton extends StatelessWidget {
       padding: const EdgeInsets.all(24),
       gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
         maxCrossAxisExtent: 390,
-        mainAxisExtent: 292,
+        mainAxisExtent: 310,
         crossAxisSpacing: 16,
         mainAxisSpacing: 16,
       ),

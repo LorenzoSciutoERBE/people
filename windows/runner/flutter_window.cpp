@@ -1,11 +1,15 @@
 #include "flutter_window.h"
 
 #include <winrt/Windows.Foundation.h>
+#include <winrt/Windows.Foundation.Collections.h>
+#include <winrt/Windows.Globalization.h>
 #include <winrt/Windows.Graphics.Imaging.h>
 #include <winrt/Windows.Media.Ocr.h>
 #include <winrt/Windows.Storage.Streams.h>
 #include <winrt/base.h>
 
+#include <algorithm>
+#include <cwctype>
 #include <optional>
 #include <string>
 #include <vector>
@@ -15,32 +19,98 @@
 namespace {
 using flutter::EncodableValue;
 using flutter::MethodResult;
+using winrt::Windows::Globalization::Language;
+using winrt::Windows::Graphics::Imaging::BitmapAlphaMode;
+using winrt::Windows::Graphics::Imaging::BitmapDecoder;
+using winrt::Windows::Graphics::Imaging::BitmapPixelFormat;
+using winrt::Windows::Graphics::Imaging::SoftwareBitmap;
+using winrt::Windows::Media::Ocr::OcrEngine;
+using winrt::Windows::Storage::Streams::DataWriter;
+using winrt::Windows::Storage::Streams::InMemoryRandomAccessStream;
+
+std::wstring ExtractLines(
+    const winrt::Windows::Media::Ocr::OcrResult& recognition) {
+  std::wstring text;
+  for (const auto& line : recognition.Lines()) {
+    if (!text.empty()) text += L"\n";
+    text += line.Text().c_str();
+  }
+  return text;
+}
+
+int ScoreRecognizedText(const std::wstring& text, bool is_italian_engine) {
+  std::wstring lower;
+  lower.reserve(text.size());
+  int non_space = 0;
+  int accented = 0;
+  for (wchar_t ch : text) {
+    if (!std::iswspace(ch)) ++non_space;
+    if (ch > 127) ++accented;
+    lower.push_back(static_cast<wchar_t>(std::towlower(ch)));
+  }
+  int italian_hits = 0;
+  for (const wchar_t* word :
+       {L"esperienza", L"competenze", L"istruzione", L"formazione",
+        L"lingue", L"profilo", L"motivazione", L"anni", L"laurea", L"lavoro"}) {
+    if (lower.find(word) != std::wstring::npos) ++italian_hits;
+  }
+  int english_hits = 0;
+  for (const wchar_t* word :
+       {L"experience", L"skills", L"education", L"summary", L"profile",
+        L"employment", L"software", L"engineer", L"years", L"work"}) {
+    if (lower.find(word) != std::wstring::npos) ++english_hits;
+  }
+  const int language_bonus = is_italian_engine
+                                 ? (italian_hits * 40 + accented * 10)
+                                 : (english_hits * 40);
+  return non_space + language_bonus;
+}
 
 winrt::fire_and_forget RecognizeResumeImage(
     std::vector<uint8_t> image_bytes,
     std::unique_ptr<MethodResult<EncodableValue>> result) {
   try {
-    auto stream = winrt::Windows::Storage::Streams::InMemoryRandomAccessStream();
-    auto writer = winrt::Windows::Storage::Streams::DataWriter(stream);
+    auto stream = InMemoryRandomAccessStream();
+    auto writer = DataWriter(stream);
     writer.WriteBytes(image_bytes);
     co_await writer.StoreAsync();
     writer.DetachStream();
     stream.Seek(0);
 
-    auto decoder =
-        co_await winrt::Windows::Graphics::Imaging::BitmapDecoder::CreateAsync(
-            stream);
-    auto bitmap = co_await decoder.GetSoftwareBitmapAsync();
-    auto engine =
-        winrt::Windows::Media::Ocr::OcrEngine::TryCreateFromUserProfileLanguages();
-    if (!engine) {
-      result->Error("ocr_language_unavailable",
-                    "No supported Windows OCR language is installed.");
+    auto decoder = co_await BitmapDecoder::CreateAsync(stream);
+    auto bitmap = co_await decoder.GetSoftwareBitmapAsync(
+        BitmapPixelFormat::Bgra8, BitmapAlphaMode::Ignore);
+
+    std::vector<std::pair<OcrEngine, bool>> engines;
+    if (auto en_engine = OcrEngine::TryCreateFromLanguage(Language(L"en-US"))) {
+      engines.emplace_back(std::move(en_engine), false);
+    }
+    if (auto it_engine = OcrEngine::TryCreateFromLanguage(Language(L"it-IT"))) {
+      engines.emplace_back(std::move(it_engine), true);
+    }
+    if (engines.empty()) {
+      if (auto fallback = OcrEngine::TryCreateFromUserProfileLanguages()) {
+        engines.emplace_back(std::move(fallback), false);
+      }
+    }
+    if (engines.empty()) {
+      result->Error("ocr_unavailable",
+                    "No Windows OCR engine is installed on this system.");
       co_return;
     }
 
-    auto recognition = co_await engine.RecognizeAsync(bitmap);
-    result->Success(EncodableValue(winrt::to_string(recognition.Text())));
+    std::wstring best_text;
+    int best_score = -1;
+    for (const auto& [engine, is_italian] : engines) {
+      auto recognition = co_await engine.RecognizeAsync(bitmap);
+      auto candidate = ExtractLines(recognition);
+      const int score = ScoreRecognizedText(candidate, is_italian);
+      if (score > best_score) {
+        best_score = score;
+        best_text = std::move(candidate);
+      }
+    }
+    result->Success(EncodableValue(winrt::to_string(best_text)));
   } catch (const winrt::hresult_error& error) {
     result->Error("ocr_failed", winrt::to_string(error.message()));
   }

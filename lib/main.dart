@@ -23,13 +23,21 @@ Future<void> main() async {
 Future<void> _initializeWindow() async {
   if (!Platform.isWindows) return;
   await windowManager.ensureInitialized();
-  await windowManager.waitUntilReadyToShow(
-    const WindowOptions(
-      titleBarStyle: TitleBarStyle.hidden,
-      windowButtonVisibility: false,
-      minimumSize: Size(1100, 600),
-      backgroundColor: Colors.white,
-    ),
+  const options = WindowOptions(
+    titleBarStyle: TitleBarStyle.hidden,
+    windowButtonVisibility: false,
+    minimumSize: Size(1100, 600),
+    backgroundColor: Colors.white,
   );
+  await windowManager.waitUntilReadyToShow(options, () async {
+    await windowManager.maximize();
+    await windowManager.show();
+    await windowManager.focus();
+  });
   await windowManager.maximize();
+  WidgetsBinding.instance.addPostFrameCallback((_) async {
+    if (!await windowManager.isMaximized()) {
+      await windowManager.maximize();
+    }
+  });
 }

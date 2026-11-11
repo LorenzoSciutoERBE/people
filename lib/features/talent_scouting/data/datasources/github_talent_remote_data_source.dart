@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:http/http.dart' as http;
 
+import '../../../../core/config/app_config.dart';
 import '../../domain/entities/talent_query.dart';
 import '../../domain/failures/scouting_failure.dart';
 import '../models/github_talent_model.dart';
@@ -102,23 +103,12 @@ class GitHubTalentRemoteDataSource {
     }
   }
 
-  Uri _apiUri(String path) {
-    final baseUri = Uri.parse(
-      apiBaseUrl.endsWith('/') ? apiBaseUrl : '$apiBaseUrl/',
-    );
-    return baseUri.resolve(path);
-  }
-
-  Map<String, String> _headers(String accessToken) => <String, String>{
-    HttpHeaders.acceptHeader: 'application/vnd.github+json',
-    HttpHeaders.authorizationHeader: 'Bearer $accessToken',
-    'X-GitHub-Api-Version': '2022-11-28',
-  };
+  Uri _apiUri(String path) => AppConfig.resolveGitHubApiUri(apiBaseUrl, path);
 
   Future<http.Response> _get(Uri uri, String accessToken) async {
     try {
       return await client
-          .get(uri, headers: _headers(accessToken))
+          .get(uri, headers: AppConfig.githubApiHeaders(accessToken))
           .timeout(requestTimeout);
     } on TimeoutException {
       throw const ScoutingFailure(ScoutingFailureReason.requestTimedOut);

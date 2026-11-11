@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:people/features/candidate_management/di/candidate_management_dependencies.dart';
 import 'package:people/features/candidate_management/domain/entities/recruiting_data.dart';
 import 'package:people/features/candidate_management/domain/repositories/candidate_repository.dart';
+import 'package:people/features/candidate_management/presentation/providers/candidate_management_providers.dart';
 import 'package:people/features/candidate_management/presentation/widgets/candidate_details_page.dart';
+import 'package:people/features/candidate_management/presentation/widgets/star_rating.dart';
 import 'package:people/l10n/app_localizations.dart';
 
 class _CandidateRepository implements CandidateRepository {
@@ -30,7 +31,7 @@ class _CandidateRepository implements CandidateRepository {
   }
 
   @override
-  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+  Object? noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
 void main() {
@@ -83,12 +84,44 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(Dialog), findsOneWidget);
+    // Personal details are hidden by default so the hiring process is in focus.
+    expect(find.byType(TextField), findsNothing);
+    expect(find.byType(StarRating), findsWidgets);
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(CandidateDetailsPage)),
+    );
+    container.read(evaluationsVisibleProvider.notifier).toggle();
+    await tester.pumpAndSettle();
+    expect(find.byType(StarRating), findsNothing);
+    container.read(evaluationsVisibleProvider.notifier).toggle();
+    await tester.pumpAndSettle();
+    expect(find.byType(StarRating), findsWidgets);
+
+    await tester.tap(find.byKey(const Key('toggle-candidate-profile')));
+    await tester.pumpAndSettle();
+
     final firstName = find.byType(TextField).first;
     await tester.enterText(firstName, 'Grace');
     await tester.pump();
+    await tester.tap(find.byKey(const Key('toggle-candidate-profile')));
+    await tester.pumpAndSettle();
+    expect(find.text('Unsaved changes'), findsOneWidget);
+    await tester.tap(find.text('Keep editing'));
+    await tester.pumpAndSettle();
+    expect(tester.widget<TextField>(firstName).controller!.text, 'Grace');
     await tester.tap(find.text('Save candidate'));
     await tester.pumpAndSettle();
     expect(repository.data.candidates.single.firstName, 'Grace');
+
+    await tester.enterText(firstName, 'Discarded draft');
+    await tester.tap(find.byKey(const Key('toggle-candidate-profile')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Discard changes'));
+    await tester.pumpAndSettle();
+    expect(find.byType(TextField), findsNothing);
+    await tester.tap(find.byKey(const Key('toggle-candidate-profile')));
+    await tester.pumpAndSettle();
+    expect(tester.widget<TextField>(firstName).controller!.text, 'Grace');
 
     await tester.enterText(firstName, '');
     await tester.pump();

@@ -11,10 +11,18 @@ class SaveInterviewFeedback {
     required String stageId,
     required FeedbackDecision decision,
     required String notes,
+    DateTime? recordedAt,
+    bool? feedbackSharedWithCandidate,
+    DateTime? scheduledAt,
+    String? interviewer,
   }) => _repository.saveInterviewFeedback(
     candidateId,
     stageId: stageId,
     decision: decision,
     notes: notes,
+    recordedAt: recordedAt,
+    feedbackSharedWithCandidate: feedbackSharedWithCandidate,
+    scheduledAt: scheduledAt,
+    interviewer: interviewer,
   );
 }

@@ -3,19 +3,47 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:uuid/uuid.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../l10n/app_localizations.dart';
 import '../../../candidate_management/domain/entities/recruiting_data.dart';
 import '../../../candidate_management/presentation/providers/candidate_management_providers.dart';
+import '../../../candidate_management/presentation/widgets/candidate_dialog_support.dart';
 import '../../domain/entities/talent.dart';
 import 'language_badge.dart';
 
 class TalentCard extends ConsumerWidget {
-  const TalentCard({super.key, required this.talent});
+  TalentCard({super.key, required Talent talent})
+    : username = talent.username,
+      profileUrl = talent.profileUrl,
+      avatarUrl = talent.avatarUrl,
+      displayName = talent.displayName,
+      location = talent.location,
+      biography = talent.biography,
+      publicRepositoryCount = talent.publicRepositoryCount,
+      followerCount = talent.followerCount,
+      languages = talent.languages;
 
-  final Talent talent;
+  TalentCard.favorite({super.key, required FavoriteTalent favorite})
+    : username = favorite.username,
+      profileUrl = favorite.profileUrl,
+      avatarUrl = favorite.avatarUrl,
+      displayName = favorite.displayName,
+      location = favorite.location,
+      biography = favorite.biography,
+      publicRepositoryCount = null,
+      followerCount = null,
+      languages = favorite.languages;
+
+  final String username;
+  final String profileUrl;
+  final String avatarUrl;
+  final String? displayName;
+  final String? location;
+  final String? biography;
+  final int? publicRepositoryCount;
+  final int? followerCount;
+  final List<String> languages;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -24,11 +52,17 @@ class TalentCard extends ConsumerWidget {
     final count = NumberFormat.decimalPattern(
       Localizations.localeOf(context).toString(),
     );
-    final displayName = talent.displayName?.trim();
+    final trimmedName = displayName?.trim();
     final recruitingState = ref.watch(candidateManagementControllerProvider);
-    final favorite = recruitingState.asData?.value.favorites
-        .where((item) => item.id == talent.username.toLowerCase())
+    final recruitingData = recruitingState.asData?.value;
+    final favorite = recruitingData?.favorites
+        .where((item) => item.id == username.toLowerCase())
         .firstOrNull;
+    final candidateExists =
+        recruitingData?.candidates.any(
+          (candidate) => candidate.githubUrl == profileUrl,
+        ) ??
+        false;
     return Card(
       clipBehavior: Clip.antiAlias,
       child: Padding(
@@ -43,7 +77,7 @@ class TalentCard extends ConsumerWidget {
                   backgroundColor: theme.colorScheme.surfaceContainerHighest,
                   child: ClipOval(
                     child: CachedNetworkImage(
-                      imageUrl: talent.avatarUrl,
+                      imageUrl: avatarUrl,
                       width: 56,
                       height: 56,
                       fit: BoxFit.cover,
@@ -60,15 +94,15 @@ class TalentCard extends ConsumerWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        displayName == null || displayName.isEmpty
-                            ? talent.username
-                            : displayName,
+                        trimmedName == null || trimmedName.isEmpty
+                            ? username
+                            : trimmedName,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: theme.textTheme.titleMedium,
                       ),
                       Text(
-                        '@${talent.username}',
+                        '@$username',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: theme.textTheme.bodyMedium?.copyWith(
@@ -81,14 +115,14 @@ class TalentCard extends ConsumerWidget {
               ],
             ),
             const SizedBox(height: 12),
-            if (talent.location case final location? when location.isNotEmpty)
+            if (location case final loc? when loc.isNotEmpty)
               Row(
                 children: [
                   const Icon(Icons.location_on_outlined, size: 16),
                   const SizedBox(width: 4),
                   Expanded(
                     child: Text(
-                      location,
+                      loc,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: theme.textTheme.bodySmall,
@@ -99,36 +133,37 @@ class TalentCard extends ConsumerWidget {
             const SizedBox(height: 8),
             Expanded(
               child: Text(
-                talent.biography?.trim().isNotEmpty == true
-                    ? talent.biography!.trim()
+                biography?.trim().isNotEmpty == true
+                    ? biography!.trim()
                     : localization.scoutingNoBiography,
                 maxLines: 3,
                 overflow: TextOverflow.ellipsis,
                 style: theme.textTheme.bodyMedium,
               ),
             ),
-            Row(
-              children: [
-                const Icon(Icons.folder_outlined, size: 16),
-                const SizedBox(width: 4),
-                Text(count.format(talent.publicRepositoryCount)),
-                const SizedBox(width: 12),
-                const Icon(Icons.people_outline, size: 16),
-                const SizedBox(width: 4),
-                Text(count.format(talent.followerCount)),
-                const Spacer(),
-                Text(
-                  localization.scoutingPublicActivity,
-                  style: theme.textTheme.labelSmall,
-                ),
-              ],
-            ),
-            if (talent.languages.isNotEmpty) ...[
+            if (publicRepositoryCount != null && followerCount != null)
+              Row(
+                children: [
+                  const Icon(Icons.folder_outlined, size: 16),
+                  const SizedBox(width: 4),
+                  Text(count.format(publicRepositoryCount)),
+                  const SizedBox(width: 12),
+                  const Icon(Icons.people_outline, size: 16),
+                  const SizedBox(width: 4),
+                  Text(count.format(followerCount)),
+                  const Spacer(),
+                  Text(
+                    localization.scoutingPublicActivity,
+                    style: theme.textTheme.labelSmall,
+                  ),
+                ],
+              ),
+            if (languages.isNotEmpty) ...[
               const SizedBox(height: 10),
               Wrap(
                 spacing: 4,
                 runSpacing: 0,
-                children: talent.languages
+                children: languages
                     .map((language) => LanguageBadge(language: language))
                     .toList(growable: false),
               ),
@@ -154,14 +189,23 @@ class TalentCard extends ConsumerWidget {
                     icon: Icon(
                       favorite == null ? Icons.star_outline : Icons.star,
                       size: 20,
+                      color: favorite == null ? null : Colors.amber.shade700,
                     ),
                   ),
                   IconButton(
-                    tooltip: localization.candidateAddFromScouting,
+                    tooltip: candidateExists
+                        ? localization.candidateAlreadyTracked
+                        : localization.candidateAddFromScouting,
                     onPressed: recruitingState.hasValue
                         ? () => _addToHiringBoard(context, ref, localization)
                         : null,
-                    icon: const Icon(Icons.playlist_add, size: 20),
+                    icon: Icon(
+                      candidateExists
+                          ? Icons.playlist_add_check
+                          : Icons.playlist_add,
+                      size: 20,
+                      color: candidateExists ? const Color(0xFF1E8E3E) : null,
+                    ),
                   ),
                   TextButton.icon(
                     onPressed: () => _openProfile(context, localization),
@@ -183,7 +227,7 @@ class TalentCard extends ConsumerWidget {
   ) async {
     try {
       final opened = await launchUrl(
-        Uri.parse(talent.profileUrl),
+        Uri.parse(profileUrl),
         mode: LaunchMode.externalApplication,
       );
       if (!opened && context.mounted) {
@@ -212,7 +256,7 @@ class TalentCard extends ConsumerWidget {
           ?.value;
       if (data == null) return;
       if (data.candidates.any(
-        (candidate) => candidate.githubUrl == talent.profileUrl,
+        (candidate) => candidate.githubUrl == profileUrl,
       )) {
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -221,62 +265,29 @@ class TalentCard extends ConsumerWidget {
         }
         return;
       }
-      final activeSources = data.sources
-          .where((source) => source.isActive)
-          .toList(growable: false);
-      if (activeSources.isEmpty || data.stages.isEmpty) {
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(localization.candidateActionFailed)),
-          );
-        }
+      final candidate = createCandidateFromGithubProfile(
+        data: data,
+        username: username,
+        profileUrl: profileUrl,
+        displayName: displayName,
+        location: location,
+        biography: biography,
+        languages: languages,
+      );
+      if (candidate == null) {
+        if (context.mounted) showCandidateActionError(context);
         return;
       }
-      final source =
-          activeSources
-              .where((candidateSource) => candidateSource.id == 'github')
-              .firstOrNull ??
-          activeSources.first;
-      final displayName = talent.displayName?.trim();
-      final nameParts =
-          (displayName == null || displayName.isEmpty
-                  ? talent.username
-                  : displayName)
-              .split(RegExp(r'\s+'));
-      final now = DateTime.now().toUtc();
       await ref
           .read(candidateManagementControllerProvider.notifier)
-          .saveCandidate(
-            Candidate(
-              id: const Uuid().v4(),
-              firstName: nameParts.first,
-              lastName: nameParts.length > 1 ? nameParts.skip(1).join(' ') : '',
-              location: talent.location ?? '',
-              headline: talent.biography ?? '',
-              skills: talent.languages,
-              githubUrl: talent.profileUrl,
-              sourceId: source.id,
-              stageId:
-                  data.stages
-                      .where((stage) => stage.id == 'new')
-                      .firstOrNull
-                      ?.id ??
-                  data.stages.first.id,
-              createdAt: now,
-              updatedAt: now,
-            ),
-          );
+          .saveCandidate(candidate);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(localization.candidateAddFromScouting)),
         );
       }
     } on Object {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(localization.candidateActionFailed)),
-        );
-      }
+      if (context.mounted) showCandidateActionError(context);
     }
   }
 
@@ -295,14 +306,14 @@ class TalentCard extends ConsumerWidget {
       } else {
         await controller.saveFavorite(
           FavoriteTalent(
-            id: talent.username.toLowerCase(),
-            username: talent.username,
-            profileUrl: talent.profileUrl,
-            avatarUrl: talent.avatarUrl,
-            displayName: talent.displayName ?? '',
-            location: talent.location ?? '',
-            biography: talent.biography ?? '',
-            languages: talent.languages,
+            id: username.toLowerCase(),
+            username: username,
+            profileUrl: profileUrl,
+            avatarUrl: avatarUrl,
+            displayName: displayName ?? '',
+            location: location ?? '',
+            biography: biography ?? '',
+            languages: languages,
             savedAt: DateTime.now().toUtc(),
           ),
         );

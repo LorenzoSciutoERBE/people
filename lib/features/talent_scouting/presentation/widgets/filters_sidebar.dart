@@ -73,9 +73,19 @@ class _FiltersSidebarState extends ConsumerState<FiltersSidebar> {
                 localization.scoutingFiltersTitle,
                 style: Theme.of(context).textTheme.titleLarge,
               ),
+              const SizedBox(height: 16),
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF4F7FB),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: const Color(0xFFE4EAF2)),
+                ),
+                child: const Padding(
+                  padding: EdgeInsets.all(14),
+                  child: AuthStatusPanel(),
+                ),
+              ),
               const SizedBox(height: 20),
-              const AuthStatusPanel(),
-              const Divider(height: 32),
               TextField(
                 controller: _keywordsController,
                 decoration: InputDecoration(
@@ -92,24 +102,6 @@ class _FiltersSidebarState extends ConsumerState<FiltersSidebar> {
                 onSubmitted: (_) => _search(),
               ),
               const SizedBox(height: 16),
-              FilledButton.icon(
-                onPressed: searchEnabled ? _search : null,
-                icon: isSearching
-                    ? const SizedBox.square(
-                        dimension: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.travel_explore),
-                label: Text(
-                  isSearching
-                      ? localization.scoutingInProgress
-                      : localization.scoutingStartButton,
-                ),
-                style: FilledButton.styleFrom(
-                  minimumSize: const Size.fromHeight(52),
-                ),
-              ),
-              const SizedBox(height: 24),
               TextField(
                 controller: _locationController,
                 decoration: InputDecoration(
@@ -140,6 +132,24 @@ class _FiltersSidebarState extends ConsumerState<FiltersSidebar> {
                     .read(scoutingFiltersProvider.notifier)
                     .updateMinimumFollowers,
                 maximum: 10000,
+              ),
+              const SizedBox(height: 16),
+              FilledButton.icon(
+                onPressed: searchEnabled ? _search : null,
+                icon: isSearching
+                    ? const SizedBox.square(
+                        dimension: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.travel_explore),
+                label: Text(
+                  isSearching
+                      ? localization.scoutingInProgress
+                      : localization.scoutingStartButton,
+                ),
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size.fromHeight(52),
+                ),
               ),
               const SizedBox(height: 8),
               Align(

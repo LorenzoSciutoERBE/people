@@ -5,6 +5,7 @@
 - Everything in the repository is written in **English only**: identifiers (classes, methods, variables, files), comments, documentation, commit messages, test names, log and exception messages.
 - **Never** write Italian (or any non-English) comments, names, or docs in code, even temporarily.
 - The only exception is the Italian UI translation file (`lib/l10n/app_it.arb`), which holds user-facing strings and nothing else.
+- Italian may be used in the user-facing chat only, never in authored code, tests, documentation, comments, logs, or commit messages. Generated localization files are produced by Flutter tooling; do not edit them manually.
 
 ## Internationalization
 
@@ -38,6 +39,11 @@
 
 - Use the latest stable package releases compatible with the current Flutter/Dart SDK; run `flutter pub outdated` after dependency changes.
 - Before merging run `dart format lib test`, `flutter analyze`, `flutter test`.
+- After significant changes, autonomously add or update regression tests and run them before reporting completion.
+- For UI workflows, use Flutter's official SDK `integration_test` package and initialize `IntegrationTestWidgetsFlutterBinding.ensureInitialized()`. Interact through `WidgetTester` and locate controls by stable English `Key` values or localized text.
+- Keep unit and widget tests for fast, focused coverage; integration tests complement them rather than replace them.
+- Run affected integration tests on Windows with `flutter test integration_test -d windows`. Use isolated temporary data, no production vault, credentials, or external network dependencies. Verify persistence by reopening stored data, not merely by asserting that text was entered.
+- Format `integration_test` alongside `lib` and `test`. If a required device or build tool is unavailable, state the blocker and never claim the integration tests passed.
 - Do not commit build output, secrets, local configuration, or user data.
 
 ## Design system

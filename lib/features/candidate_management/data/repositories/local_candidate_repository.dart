@@ -7,6 +7,7 @@ import 'dart:io';
 import 'package:uuid/uuid.dart';
 
 import '../../domain/entities/recruiting_data.dart';
+import '../../domain/entities/employment_plan.dart';
 import '../../domain/failures/candidate_repository_exception.dart';
 import '../../domain/repositories/candidate_repository.dart';
 import '../datasources/encrypted_vault.dart';
@@ -29,19 +30,7 @@ class LocalCandidateRepository implements CandidateRepository {
   Future<void> _operationQueue = Future<void>.value();
 
   @override
-  Future<RecruitingData> load() => _serialize(() async {
-    final snapshot = File('${_directory.path}\\$_snapshotName');
-    if (!await snapshot.exists()) return RecruitingData.initial();
-    final clearBytes = await _cipher.decrypt(await snapshot.readAsBytes());
-    final decoded = jsonDecode(utf8.decode(clearBytes));
-    if (decoded is! Map) {
-      throw const FormatException('Candidate vault contents are invalid.');
-    }
-    final data = RecruitingDataModel.decode(
-      decoded.map((key, value) => MapEntry(key as String, value)),
-    );
-    return data;
-  });
+  Future<RecruitingData> load() => _serialize(_readSnapshot);
 
   @override
   Future<Candidate> saveCandidate(Candidate candidate, {List<int>? cvBytes}) =>
@@ -64,10 +53,12 @@ class LocalCandidateRepository implements CandidateRepository {
         // Pipeline progress, interviews, offer and the stored CV are owned by
         // the repository; edits cannot overwrite them.
         var storedCandidate = existing == null
-            ? candidate.copyWith(stageId: _initialStageId(data.stages))
+            ? candidate.copyWith(stageId: _initialStageId(data))
             : candidate.copyWith(
                 stageId: existing.stageId,
                 interviews: existing.interviews,
+                reviews: existing.reviews,
+                employmentPlan: existing.employmentPlan,
                 offer: existing.offer,
                 clearOffer: existing.offer == null,
                 cvStorageKey: existing.cvStorageKey,
@@ -84,14 +75,7 @@ class LocalCandidateRepository implements CandidateRepository {
             if (existing.id != candidate.id) existing,
           storedCandidate,
         ]..sort((first, second) => second.updatedAt.compareTo(first.updatedAt));
-        await _writeSnapshot(
-          RecruitingData(
-            candidates: candidates,
-            sources: data.sources,
-            stages: data.stages,
-            favorites: data.favorites,
-          ),
-        );
+        await _writeSnapshot(data.copyWith(candidates: candidates));
         if (replacedResumeKey != null) {
           final replaced = File(_resumePath(replacedResumeKey));
           if (await replaced.exists()) await replaced.delete();
@@ -99,12 +83,45 @@ class LocalCandidateRepository implements CandidateRepository {
         return storedCandidate;
       });
 
-  String _initialStageId(List<HiringStage> stages) {
-    final active =
-        stages
-            .where((stage) => stage.terminalOutcome == TerminalOutcome.active)
-            .toList()
-          ..sort((first, second) => first.order.compareTo(second.order));
+  @override
+  Future<void> saveEmployeeReview(String candidateId, EmployeeReview review) =>
+      _serialize(() async {
+        final data = await _readSnapshot();
+        final candidate = _candidate(data, candidateId);
+        if (_stage(data, candidate.stageId).terminalOutcome !=
+            TerminalOutcome.hired) {
+          throw const CandidateRepositoryException('hired_candidate_required');
+        }
+        if (review.id.trim().isEmpty ||
+            review.title.trim().isEmpty ||
+            review.reviewer.trim().isEmpty ||
+            review.notes.trim().isEmpty) {
+          throw const CandidateRepositoryException('employee_review_invalid');
+        }
+        final stored = EmployeeReview(
+          id: review.id,
+          reviewedAt: review.reviewedAt.toUtc(),
+          reviewer: review.reviewer.trim(),
+          title: review.title.trim(),
+          notes: review.notes.trim(),
+          goals: review.goals.trim(),
+        );
+        final reviews = [
+          for (final existing in candidate.reviews)
+            if (existing.id != review.id) existing,
+          stored,
+        ]..sort((a, b) => b.reviewedAt.compareTo(a.reviewedAt));
+        await _replaceCandidate(
+          data,
+          candidate.copyWith(
+            reviews: reviews,
+            updatedAt: DateTime.now().toUtc(),
+          ),
+        );
+      });
+
+  String _initialStageId(RecruitingData data) {
+    final active = data.activeStages;
     if (active.isEmpty) {
       throw const CandidateRepositoryException('stage_not_found');
     }
@@ -117,15 +134,13 @@ class LocalCandidateRepository implements CandidateRepository {
     final candidate = data.candidates
         .where((value) => value.id == candidateId)
         .firstOrNull;
-    final updated = RecruitingData(
-      candidates: data.candidates
-          .where((value) => value.id != candidateId)
-          .toList(growable: false),
-      sources: data.sources,
-      stages: data.stages,
-      favorites: data.favorites,
+    await _writeSnapshot(
+      data.copyWith(
+        candidates: data.candidates
+            .where((value) => value.id != candidateId)
+            .toList(growable: false),
+      ),
     );
-    await _writeSnapshot(updated);
     if (candidate?.cvStorageKey case final storageKey?) {
       final resume = File(_resumePath(storageKey));
       if (await resume.exists()) await resume.delete();
@@ -140,24 +155,14 @@ class LocalCandidateRepository implements CandidateRepository {
         if (existing.id != favorite.id) existing,
       favorite,
     ]..sort((first, second) => second.savedAt.compareTo(first.savedAt));
-    await _writeSnapshot(
-      RecruitingData(
-        candidates: data.candidates,
-        sources: data.sources,
-        stages: data.stages,
-        favorites: favorites,
-      ),
-    );
+    await _writeSnapshot(data.copyWith(favorites: favorites));
   });
 
   @override
   Future<void> deleteFavorite(String favoriteId) => _serialize(() async {
     final data = await _readSnapshot();
     await _writeSnapshot(
-      RecruitingData(
-        candidates: data.candidates,
-        sources: data.sources,
-        stages: data.stages,
+      data.copyWith(
         favorites: data.favorites
             .where((favorite) => favorite.id != favoriteId)
             .toList(growable: false),
@@ -171,10 +176,11 @@ class LocalCandidateRepository implements CandidateRepository {
     required String stageId,
     required FeedbackDecision decision,
     required String notes,
+    DateTime? recordedAt,
+    bool? feedbackSharedWithCandidate,
+    DateTime? scheduledAt,
+    String? interviewer,
   }) => _serialize(() async {
-    if (decision == FeedbackDecision.pending) {
-      throw const CandidateRepositoryException('feedback_decision_required');
-    }
     final data = await _readSnapshot();
     final candidate = _candidate(data, candidateId);
     if (!data.requiresFeedback(stageId)) {
@@ -187,31 +193,47 @@ class LocalCandidateRepository implements CandidateRepository {
       throw const CandidateRepositoryException('feedback_stage_mismatch');
     }
     final now = DateTime.now().toUtc();
+    if (stageId == 'new' && decision != FeedbackDecision.pending) {
+      throw const CandidateRepositoryException('feedback_not_allowed');
+    }
+    if (stageId != 'new' &&
+        decision != FeedbackDecision.pending &&
+        ((scheduledAt ?? existing?.scheduledAt) == null ||
+            (interviewer ?? existing?.interviewer ?? '').trim().isEmpty)) {
+      throw const CandidateRepositoryException('interview_schedule_required');
+    }
+    final shared =
+        decision != FeedbackDecision.pending &&
+        (feedbackSharedWithCandidate ??
+            (existing?.decision == decision &&
+                (existing?.feedbackSharedWithCandidate ?? false)));
     final feedback = InterviewRecord(
       id: existing?.id ?? _uuid.v4(),
       stageId: stageId,
-      createdAt: existing?.createdAt ?? now,
+      createdAt: (recordedAt ?? existing?.createdAt ?? now).toUtc(),
       decision: decision,
       notes: notes.trim(),
+      feedbackSharedWithCandidate: shared,
+      scheduledAt: scheduledAt?.toUtc() ?? existing?.scheduledAt,
+      interviewer: (interviewer ?? existing?.interviewer ?? '').trim(),
     );
+    final interviews = <InterviewRecord>[
+      for (final record in candidate.interviews)
+        if (record.stageId != stageId) record,
+      feedback,
+    ]..sort((first, second) => first.createdAt.compareTo(second.createdAt));
     await _replaceCandidate(
       data,
-      candidate.copyWith(
-        interviews: <InterviewRecord>[
-          for (final record in candidate.interviews)
-            if (record.stageId != stageId) record,
-          feedback,
-        ],
-        updatedAt: now,
-      ),
+      candidate.copyWith(interviews: interviews, updatedAt: now),
     );
   });
 
   @override
   Future<void> moveCandidate(
     String candidateId,
-    String destinationStageId,
-  ) => _serialize(() async {
+    String destinationStageId, {
+    EmploymentPlan? employmentPlan,
+  }) => _serialize(() async {
     final data = await _readSnapshot();
     final candidate = _candidate(data, candidateId);
     final currentStage = _stage(data, candidate.stageId);
@@ -221,35 +243,45 @@ class LocalCandidateRepository implements CandidateRepository {
         destination.id == currentStage.id) {
       throw const CandidateRepositoryException('invalid_stage_transition');
     }
-    final latestFeedback = candidate.latestFeedbackFor(currentStage.id);
-    final feedbackRequired = data.requiresFeedback(currentStage.id);
-    if (feedbackRequired && latestFeedback == null) {
-      throw const CandidateRepositoryException('positive_feedback_required');
-    }
-    final decision = latestFeedback?.decision;
+    final feedback = candidate.latestFeedbackFor(currentStage.id);
     if (destination.terminalOutcome == TerminalOutcome.hired) {
-      if (!currentStage.isOfferStage ||
-          decision != FeedbackDecision.positive ||
-          candidate.offer?.status != OfferStatus.accepted) {
+      if (!currentStage.isOfferStage) {
+        throw const CandidateRepositoryException('offer_stage_required');
+      }
+      if (candidate.offer?.status != OfferStatus.accepted) {
         throw const CandidateRepositoryException('accepted_offer_required');
       }
-    } else if (destination.terminalOutcome == TerminalOutcome.rejected) {
-      if (feedbackRequired &&
-          decision != FeedbackDecision.negative &&
-          decision != FeedbackDecision.neutral) {
-        throw const CandidateRepositoryException('negative_feedback_required');
+      if (employmentPlan != null && !employmentPlan.isValid) {
+        throw const CandidateRepositoryException('employment_plan_invalid');
       }
-    } else if (destination.terminalOutcome == TerminalOutcome.active) {
-      if (feedbackRequired &&
-          decision != FeedbackDecision.positive &&
-          decision != FeedbackDecision.neutral) {
-        throw const CandidateRepositoryException('positive_feedback_required');
+    } else {
+      if (currentStage.id == 'new') {
+        if (destination.terminalOutcome == TerminalOutcome.rejected ||
+            feedback == null ||
+            feedback.notes.trim().isEmpty) {
+          throw const CandidateRepositoryException('cv_review_required');
+        }
+      } else if (!currentStage.isOfferStage) {
+        final requiredDecision =
+            destination.terminalOutcome == TerminalOutcome.rejected
+            ? FeedbackDecision.negative
+            : FeedbackDecision.positive;
+        if (feedback?.decision != requiredDecision) {
+          throw CandidateRepositoryException(
+            requiredDecision == FeedbackDecision.positive
+                ? 'positive_feedback_required'
+                : 'negative_feedback_required',
+          );
+        }
+        if (!feedback!.feedbackSharedWithCandidate) {
+          throw const CandidateRepositoryException(
+            'candidate_feedback_required',
+          );
+        }
       }
-      final stages = _activeStages(data);
-      final currentIndex = stages.indexOf(currentStage);
-      if (currentIndex < 0 ||
-          currentIndex + 1 >= stages.length ||
-          stages[currentIndex + 1].id != destination.id) {
+      if (!data
+          .availableDestinationsFor(candidate, currentStage)
+          .contains(destination)) {
         throw const CandidateRepositoryException('invalid_stage_transition');
       }
     }
@@ -257,10 +289,34 @@ class LocalCandidateRepository implements CandidateRepository {
       data,
       candidate.copyWith(
         stageId: destination.id,
+        employmentPlan: destination.terminalOutcome == TerminalOutcome.hired
+            ? employmentPlan ?? EmploymentPlan.propose(DateTime.now())
+            : candidate.employmentPlan,
         updatedAt: DateTime.now().toUtc(),
       ),
     );
   });
+
+  @override
+  Future<void> saveEmploymentPlan(String candidateId, EmploymentPlan plan) =>
+      _serialize(() async {
+        final data = await _readSnapshot();
+        final candidate = _candidate(data, candidateId);
+        if (_stage(data, candidate.stageId).terminalOutcome !=
+            TerminalOutcome.hired) {
+          throw const CandidateRepositoryException('hired_candidate_required');
+        }
+        if (!plan.isValid) {
+          throw const CandidateRepositoryException('employment_plan_invalid');
+        }
+        await _replaceCandidate(
+          data,
+          candidate.copyWith(
+            employmentPlan: plan,
+            updatedAt: DateTime.now().toUtc(),
+          ),
+        );
+      });
 
   @override
   Future<void> saveOffer(String candidateId, CandidateOffer offer) =>
@@ -285,14 +341,7 @@ class LocalCandidateRepository implements CandidateRepository {
     final data = await _readSnapshot();
     _validateSources(sources, data.candidates);
     _validateStages(stages, data.candidates);
-    await _writeSnapshot(
-      RecruitingData(
-        candidates: data.candidates,
-        sources: sources,
-        stages: stages,
-        favorites: data.favorites,
-      ),
-    );
+    await _writeSnapshot(data.copyWith(sources: sources, stages: stages));
   });
 
   @override
@@ -315,9 +364,11 @@ class LocalCandidateRepository implements CandidateRepository {
     if (decoded is! Map) {
       throw const FormatException('Candidate vault contents are invalid.');
     }
-    return RecruitingDataModel.decode(
+    final data = RecruitingDataModel.decode(
       decoded.map((key, value) => MapEntry(key as String, value)),
     );
+    if (decoded['version'] != 2) await _writeSnapshot(data);
+    return data;
   }
 
   Future<void> _writeSnapshot(RecruitingData data) async {
@@ -335,15 +386,12 @@ class LocalCandidateRepository implements CandidateRepository {
 
   Future<void> _replaceCandidate(RecruitingData data, Candidate updated) =>
       _writeSnapshot(
-        RecruitingData(
+        data.copyWith(
           candidates: data.candidates
               .map(
                 (candidate) => candidate.id == updated.id ? updated : candidate,
               )
               .toList(growable: false),
-          sources: data.sources,
-          stages: data.stages,
-          favorites: data.favorites,
         ),
       );
 
@@ -354,12 +402,6 @@ class LocalCandidateRepository implements CandidateRepository {
   HiringStage _stage(RecruitingData data, String id) =>
       data.stages.where((stage) => stage.id == id).firstOrNull ??
       (throw const CandidateRepositoryException('stage_not_found'));
-
-  List<HiringStage> _activeStages(RecruitingData data) =>
-      data.stages
-          .where((stage) => stage.terminalOutcome == TerminalOutcome.active)
-          .toList()
-        ..sort((first, second) => first.order.compareTo(second.order));
 
   String _resumePath(String storageKey) {
     if (!RegExp(r'^[a-f0-9-]{36}$').hasMatch(storageKey)) {
@@ -395,49 +437,21 @@ class LocalCandidateRepository implements CandidateRepository {
   }
 
   void _validateStages(List<HiringStage> stages, List<Candidate> candidates) {
-    _validateUniqueIds(stages.map((stage) => stage.id), 'duplicate_stage');
-    if (stages.isEmpty ||
-        stages.any(
-          (stage) => stage.id.trim().isEmpty || stage.name.trim().isEmpty,
-        )) {
-      throw const CandidateRepositoryException('invalid_stage');
-    }
-    if (stages.where((stage) => stage.isOfferStage).length != 1 ||
-        stages
-                .where(
-                  (stage) => stage.terminalOutcome == TerminalOutcome.hired,
-                )
-                .length !=
-            1 ||
-        stages
-                .where(
-                  (stage) => stage.terminalOutcome == TerminalOutcome.rejected,
-                )
-                .length !=
-            1) {
+    final expected = RecruitingData.initial().orderedStages;
+    final ordered = [...stages]..sort((a, b) => a.order.compareTo(b.order));
+    if (ordered.length != expected.length) {
       throw const CandidateRepositoryException('invalid_pipeline');
     }
-    if (!stages.any(
-          (stage) => stage.terminalOutcome == TerminalOutcome.active,
-        ) ||
-        stages.any(
-          (stage) =>
-              stage.isOfferStage &&
-              stage.terminalOutcome != TerminalOutcome.active,
-        )) {
-      throw const CandidateRepositoryException('invalid_pipeline');
-    }
-    final ordered = [...stages]
-      ..sort((first, second) => first.order.compareTo(second.order));
-    for (var index = 1; index < ordered.length; index++) {
-      if (ordered[index].order <= ordered[index - 1].order) {
-        throw const CandidateRepositoryException('duplicate_stage_order');
+    for (var index = 0; index < expected.length; index++) {
+      final actual = ordered[index];
+      final required = expected[index];
+      if (actual.id != required.id ||
+          actual.order != required.order ||
+          actual.isOfferStage != required.isOfferStage ||
+          actual.terminalOutcome != required.terminalOutcome ||
+          actual.name.trim().isEmpty) {
+        throw const CandidateRepositoryException('invalid_pipeline');
       }
-    }
-    if (candidates.any(
-      (candidate) => !stages.any((stage) => stage.id == candidate.stageId),
-    )) {
-      throw const CandidateRepositoryException('stage_in_use');
     }
   }
 

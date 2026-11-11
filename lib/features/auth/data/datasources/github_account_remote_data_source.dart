@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:http/http.dart' as http;
 
+import '../../../../core/config/app_config.dart';
 import '../../domain/failures/auth_failure.dart';
 import '../models/github_account_model.dart';
 
@@ -18,19 +19,12 @@ class GitHubAccountRemoteDataSource {
   final String apiBaseUrl;
 
   Future<GitHubAccountModel> getCurrentAccount(String accessToken) async {
-    final baseUri = Uri.parse(
-      apiBaseUrl.endsWith('/') ? apiBaseUrl : '$apiBaseUrl/',
-    );
     late final http.Response response;
     try {
       response = await client
           .get(
-            baseUri.resolve('user'),
-            headers: <String, String>{
-              HttpHeaders.acceptHeader: 'application/vnd.github+json',
-              HttpHeaders.authorizationHeader: 'Bearer $accessToken',
-              'X-GitHub-Api-Version': '2022-11-28',
-            },
+            AppConfig.resolveGitHubApiUri(apiBaseUrl, 'user'),
+            headers: AppConfig.githubApiHeaders(accessToken),
           )
           .timeout(requestTimeout);
     } on TimeoutException {

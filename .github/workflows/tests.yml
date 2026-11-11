@@ -1,0 +1,83 @@
+name: Tests
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  fast:
+    name: Formatting, analysis, unit and widget tests
+    runs-on: windows-2025
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: '3.47.8'
+          cache: true
+      - name: Run fast checks
+        shell: pwsh
+        run: ./Test-People.ps1 -Suite Fast
+      - name: Upload reports and coverage
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: fast-test-results
+          path: |
+            build/test-results/
+            coverage/lcov.info
+          if-no-files-found: warn
+          retention-days: 14
+
+  windows-integration:
+    name: Windows workflows and native OCR
+    runs-on: windows-2025
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: '3.47.8'
+          cache: true
+      - name: Install Windows OCR language capabilities
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          foreach ($language in @('en-US', 'it-IT')) {
+            $capabilityName = "Language.OCR~~~$language~0.0.1.0"
+            $capability = Get-WindowsCapability -Online -Name $capabilityName
+            if ($capability.State -ne 'Installed') {
+              $installed = Add-WindowsCapability -Online -Name $capabilityName
+              if ($installed.RestartNeeded) {
+                throw "Installing $capabilityName requires a runner restart."
+              }
+            }
+            if ((Get-WindowsCapability -Online -Name $capabilityName).State -ne 'Installed') {
+              throw "Required Windows OCR capability is unavailable: $capabilityName"
+            }
+          }
+      - name: Run Windows integration tests
+        shell: pwsh
+        run: ./Test-People.ps1 -Suite Integration
+      - name: Upload integration reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: windows-integration-results
+          path: build/test-results/
+          if-no-files-found: warn
+          retention-days: 14

@@ -1,4 +1,6 @@
-enum FeedbackDecision { pending, positive, neutral, negative }
+import 'employment_plan.dart';
+
+enum FeedbackDecision { pending, positive, negative }
 
 enum TerminalOutcome { active, hired, rejected }
 
@@ -54,6 +56,12 @@ class HiringStage {
   final int order;
   final bool isOfferStage;
   final TerminalOutcome terminalOutcome;
+
+  /// Whether this stage represents one of the three hiring interviews.
+  bool get isInterview =>
+      terminalOutcome == TerminalOutcome.active &&
+      !isOfferStage &&
+      const {'screening', 'technical', 'final'}.contains(id);
 }
 
 /// Aspects an interviewer rates from 0.5 to 5 stars, in half-star steps.
@@ -72,6 +80,9 @@ class InterviewRecord {
     required this.createdAt,
     required this.decision,
     required this.notes,
+    this.feedbackSharedWithCandidate = false,
+    this.scheduledAt,
+    this.interviewer = '',
   });
 
   final String id;
@@ -79,6 +90,27 @@ class InterviewRecord {
   final DateTime createdAt;
   final FeedbackDecision decision;
   final String notes;
+  final bool feedbackSharedWithCandidate;
+  final DateTime? scheduledAt;
+  final String interviewer;
+}
+
+class EmployeeReview {
+  const EmployeeReview({
+    required this.id,
+    required this.reviewedAt,
+    required this.reviewer,
+    required this.title,
+    required this.notes,
+    this.goals = '',
+  });
+
+  final String id;
+  final DateTime reviewedAt;
+  final String reviewer;
+  final String title;
+  final String notes;
+  final String goals;
 }
 
 class CandidateOffer {
@@ -120,10 +152,11 @@ class Candidate {
     this.linkedinUrl = '',
     this.cvFileName,
     this.cvStorageKey,
-    this.cvExtractedText = '',
     this.interviews = const <InterviewRecord>[],
+    this.reviews = const <EmployeeReview>[],
     this.ratings = const <RatingAspect, double>{},
     this.offer,
+    this.employmentPlan,
   });
 
   final String id;
@@ -143,12 +176,13 @@ class Candidate {
   final DateTime updatedAt;
   final String? cvFileName;
   final String? cvStorageKey;
-  final String cvExtractedText;
   final List<InterviewRecord> interviews;
+  final List<EmployeeReview> reviews;
 
   /// Single rating of the candidate, shared by every pipeline step.
   final Map<RatingAspect, double> ratings;
   final CandidateOffer? offer;
+  final EmploymentPlan? employmentPlan;
 
   String get fullName => '$firstName $lastName'.trim();
 
@@ -185,10 +219,11 @@ class Candidate {
     DateTime? updatedAt,
     String? cvFileName,
     String? cvStorageKey,
-    String? cvExtractedText,
     List<InterviewRecord>? interviews,
+    List<EmployeeReview>? reviews,
     Map<RatingAspect, double>? ratings,
     CandidateOffer? offer,
+    EmploymentPlan? employmentPlan,
     bool clearOffer = false,
   }) => Candidate(
     id: id,
@@ -210,10 +245,11 @@ class Candidate {
     updatedAt: updatedAt ?? this.updatedAt,
     cvFileName: cvFileName ?? this.cvFileName,
     cvStorageKey: cvStorageKey ?? this.cvStorageKey,
-    cvExtractedText: cvExtractedText ?? this.cvExtractedText,
     interviews: interviews ?? this.interviews,
+    reviews: reviews ?? this.reviews,
     ratings: ratings ?? this.ratings,
     offer: clearOffer ? null : offer ?? this.offer,
+    employmentPlan: employmentPlan ?? this.employmentPlan,
   );
 }
 
@@ -230,17 +266,76 @@ class RecruitingData {
   final List<HiringStage> stages;
   final List<FavoriteTalent> favorites;
 
-  /// Every active step except the first (intake) step asks for feedback.
-  bool requiresFeedback(String stageId) {
-    final active =
-        stages
-            .where((stage) => stage.terminalOutcome == TerminalOutcome.active)
-            .toList()
-          ..sort((first, second) => first.order.compareTo(second.order));
-    return active.isNotEmpty &&
-        active.first.id != stageId &&
-        active.any((stage) => stage.id == stageId);
+  List<Candidate> get hiredPeople {
+    final hiredIds = stages
+        .where((stage) => stage.terminalOutcome == TerminalOutcome.hired)
+        .map((stage) => stage.id)
+        .toSet();
+    return candidates
+        .where((candidate) => hiredIds.contains(candidate.stageId))
+        .toList()
+      ..sort(
+        (a, b) => a.fullName.toLowerCase().compareTo(b.fullName.toLowerCase()),
+      );
   }
+
+  List<HiringStage> get orderedStages =>
+      [...stages]..sort((first, second) => first.order.compareTo(second.order));
+
+  List<HiringStage> get activeStages =>
+      stages
+          .where((stage) => stage.terminalOutcome == TerminalOutcome.active)
+          .toList()
+        ..sort((first, second) => first.order.compareTo(second.order));
+
+  bool requiresFeedback(String stageId) =>
+      stageId == 'new' ||
+      stages.any((stage) => stage.id == stageId && stage.isInterview);
+
+  List<HiringStage> availableDestinationsFor(
+    Candidate candidate,
+    HiringStage currentStage,
+  ) {
+    if (currentStage.terminalOutcome != TerminalOutcome.active) return const [];
+    final active = activeStages;
+    final current = active.indexWhere((stage) => stage.id == candidate.stageId);
+    final next = current >= 0 && current + 1 < active.length
+        ? active[current + 1]
+        : null;
+    final feedback = candidate.latestFeedbackFor(currentStage.id);
+    final canAdvance = currentStage.id == 'new'
+        ? feedback != null && feedback.notes.trim().isNotEmpty
+        : feedback?.decision == FeedbackDecision.positive &&
+              feedback!.feedbackSharedWithCandidate;
+    final canReject =
+        (currentStage.isOfferStage &&
+            candidate.offer?.status != OfferStatus.accepted) ||
+        (feedback?.decision == FeedbackDecision.negative &&
+            feedback!.feedbackSharedWithCandidate);
+    return orderedStages
+        .where(
+          (destination) =>
+              (canAdvance && destination.id == next?.id) ||
+              (canReject &&
+                  destination.terminalOutcome == TerminalOutcome.rejected) ||
+              (currentStage.isOfferStage &&
+                  candidate.offer?.status == OfferStatus.accepted &&
+                  destination.terminalOutcome == TerminalOutcome.hired),
+        )
+        .toList(growable: false);
+  }
+
+  RecruitingData copyWith({
+    List<Candidate>? candidates,
+    List<CandidateSource>? sources,
+    List<HiringStage>? stages,
+    List<FavoriteTalent>? favorites,
+  }) => RecruitingData(
+    candidates: candidates ?? this.candidates,
+    sources: sources ?? this.sources,
+    stages: stages ?? this.stages,
+    favorites: favorites ?? this.favorites,
+  );
 
   factory RecruitingData.initial() => RecruitingData(
     candidates: const <Candidate>[],
@@ -252,27 +347,21 @@ class RecruitingData {
       CandidateSource(id: 'other', name: 'Other'),
     ],
     stages: const <HiringStage>[
-      HiringStage(id: 'new', name: 'New', order: 0),
-      HiringStage(id: 'cv_review', name: 'CV review', order: 1),
-      HiringStage(id: 'screening', name: 'Screening interview', order: 2),
-      HiringStage(id: 'technical', name: 'Technical interview', order: 3),
-      HiringStage(id: 'final', name: 'Final interview', order: 4),
-      HiringStage(
-        id: 'offer',
-        name: 'Offer / pre-contract',
-        order: 5,
-        isOfferStage: true,
-      ),
+      HiringStage(id: 'new', name: 'CV review', order: 0),
+      HiringStage(id: 'screening', name: 'Introductory interview', order: 1),
+      HiringStage(id: 'technical', name: 'Technical interview', order: 2),
+      HiringStage(id: 'final', name: 'Germany interview', order: 3),
+      HiringStage(id: 'offer', name: 'Offer', order: 4, isOfferStage: true),
       HiringStage(
         id: 'hired',
         name: 'Hired',
-        order: 6,
+        order: 5,
         terminalOutcome: TerminalOutcome.hired,
       ),
       HiringStage(
         id: 'rejected',
         name: 'Rejected',
-        order: 7,
+        order: 6,
         terminalOutcome: TerminalOutcome.rejected,
       ),
     ],

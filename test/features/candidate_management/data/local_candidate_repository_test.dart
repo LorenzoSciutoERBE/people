@@ -6,6 +6,7 @@ import 'package:people/features/candidate_management/data/datasources/encrypted_
 import 'package:people/features/candidate_management/data/models/recruiting_data_model.dart';
 import 'package:people/features/candidate_management/data/repositories/local_candidate_repository.dart';
 import 'package:people/features/candidate_management/domain/entities/recruiting_data.dart';
+import 'package:people/features/candidate_management/domain/entities/employment_plan.dart';
 import 'package:people/features/candidate_management/domain/failures/candidate_repository_exception.dart';
 
 void main() {
@@ -73,88 +74,134 @@ void main() {
   );
 
   test(
-    'requires a positive decision to advance and a negative decision to reject',
+    'completes interviews only after a decision and candidate communication',
     () async {
       final repository = createRepository();
-      final candidate = _candidate('candidate-2');
+      final candidate = _candidate('workflow');
       await repository.saveCandidate(candidate);
-      await repository.moveCandidate(candidate.id, 'cv_review');
-
       await expectLater(
         repository.moveCandidate(candidate.id, 'screening'),
-        throwsA(
-          isA<CandidateRepositoryException>().having(
-            (error) => error.code,
-            'code',
-            'positive_feedback_required',
-          ),
-        ),
+        throwsA(isA<CandidateRepositoryException>()),
       );
-
       await repository.saveInterviewFeedback(
         candidate.id,
-        stageId: 'cv_review',
-        decision: FeedbackDecision.negative,
-        notes: 'Not a match for this role.',
+        stageId: 'new',
+        decision: FeedbackDecision.pending,
+        notes: 'Relevant CV.',
       );
-      await expectLater(
-        repository.moveCandidate(candidate.id, 'screening'),
-        throwsA(
-          isA<CandidateRepositoryException>().having(
-            (error) => error.code,
-            'code',
-            'positive_feedback_required',
-          ),
-        ),
-      );
-      await repository.moveCandidate(candidate.id, 'rejected');
-      expect((await repository.load()).candidates.single.stageId, 'rejected');
-    },
-  );
-
-  test(
-    'allows hiring only after accepted offer and positive final feedback',
-    () async {
-      final repository = createRepository();
-      final candidate = _candidate('candidate-3');
-      await repository.saveCandidate(candidate);
-      var currentStage = 'new';
-      const activeStages = <String>[
-        'new',
-        'cv_review',
-        'screening',
-        'technical',
-        'final',
-        'offer',
-      ];
-
-      for (final nextStage in activeStages.skip(1)) {
-        if (currentStage != 'new') {
-          await repository.saveInterviewFeedback(
-            candidate.id,
-            stageId: currentStage,
-            decision: FeedbackDecision.positive,
-            notes: 'Proceed to the next step.',
-          );
-        }
-        await repository.moveCandidate(candidate.id, nextStage);
-        currentStage = nextStage;
+      await repository.moveCandidate(candidate.id, 'screening');
+      for (final (stage, next) in [
+        ('screening', 'technical'),
+        ('technical', 'final'),
+        ('final', 'offer'),
+      ]) {
+        await repository.saveInterviewFeedback(
+          candidate.id,
+          stageId: stage,
+          decision: FeedbackDecision.pending,
+          notes: '',
+          scheduledAt: DateTime.utc(2026, 11, 12, 14),
+          interviewer: 'Technical owner',
+        );
+        await expectLater(
+          repository.moveCandidate(candidate.id, next),
+          throwsA(isA<CandidateRepositoryException>()),
+        );
+        await repository.saveInterviewFeedback(
+          candidate.id,
+          stageId: stage,
+          decision: FeedbackDecision.positive,
+          notes: 'Proceed.',
+        );
+        await expectLater(
+          repository.moveCandidate(candidate.id, next),
+          throwsA(isA<CandidateRepositoryException>()),
+        );
+        await repository.saveInterviewFeedback(
+          candidate.id,
+          stageId: stage,
+          decision: FeedbackDecision.positive,
+          notes: 'Proceed.',
+          feedbackSharedWithCandidate: true,
+        );
+        await repository.moveCandidate(candidate.id, next);
       }
-
+      await expectLater(
+        repository.moveCandidate(candidate.id, 'hired'),
+        throwsA(isA<CandidateRepositoryException>()),
+      );
       await repository.saveOffer(
         candidate.id,
         const CandidateOffer(status: OfferStatus.accepted),
       );
-      await repository.saveInterviewFeedback(
-        candidate.id,
-        stageId: 'offer',
-        decision: FeedbackDecision.positive,
-        notes: 'Offer accepted.',
-      );
       await repository.moveCandidate(candidate.id, 'hired');
-      final loaded = await repository.load();
-      expect(loaded.candidates.single.stageId, 'hired');
-      expect(loaded.candidates.single.offer?.status, OfferStatus.accepted);
+      final reopened = (await createRepository().load()).candidates.single;
+      expect(reopened.stageId, 'hired');
+      expect(
+        reopened.interviews
+            .where((record) => record.stageId != 'new')
+            .every(
+              (record) =>
+                  record.feedbackSharedWithCandidate &&
+                  record.interviewer == 'Technical owner' &&
+                  record.scheduledAt == DateTime.utc(2026, 11, 12, 14),
+            ),
+        isTrue,
+      );
+      final plan = EmploymentPlan.propose(DateTime(2026, 1, 31));
+      await repository.saveEmploymentPlan(candidate.id, plan);
+      final review = EmployeeReview(
+        id: 'review-1',
+        reviewedAt: DateTime.utc(2026, 3),
+        title: ' First review ',
+        reviewer: ' Manager ',
+        notes: ' Strong start ',
+        goals: ' Own a project ',
+      );
+      await repository.saveEmployeeReview(candidate.id, review);
+      await repository.saveEmployeeReview(
+        candidate.id,
+        EmployeeReview(
+          id: review.id,
+          reviewedAt: review.reviewedAt,
+          title: review.title,
+          reviewer: review.reviewer,
+          notes: 'Updated discussion',
+          goals: review.goals,
+        ),
+      );
+      final stale = reopened.copyWith(firstName: 'Grace');
+      await repository.saveCandidate(stale);
+      final employee = (await createRepository().load()).hiredPeople.single;
+      expect(employee.firstName, 'Grace');
+      expect(employee.reviews, hasLength(1));
+      expect(employee.reviews.single.notes, 'Updated discussion');
+      expect(employee.reviews.single.reviewer, 'Manager');
+      expect(employee.employmentPlan!.hiredAt, plan.hiredAt);
+      expect(
+        employee.employmentPlan!.followUps.first.scheduledAt,
+        DateTime(2026, 2, 28, 15),
+      );
+      await expectLater(
+        repository.saveEmployeeReview(
+          candidate.id,
+          EmployeeReview(
+            id: 'bad',
+            reviewedAt: DateTime(2026),
+            title: '',
+            reviewer: 'Manager',
+            notes: 'Notes',
+          ),
+        ),
+        throwsA(isA<CandidateRepositoryException>()),
+      );
+      await expectLater(
+        repository.saveEmploymentPlan(
+          candidate.id,
+          EmploymentPlan(hiredAt: DateTime(2026), followUps: const []),
+        ),
+        throwsA(isA<CandidateRepositoryException>()),
+      );
     },
   );
 
@@ -164,6 +211,32 @@ void main() {
       final repository = createRepository();
       final candidate = _candidate('candidate-ratings');
       await repository.saveCandidate(candidate);
+      await expectLater(
+        repository.saveEmployeeReview(
+          candidate.id,
+          EmployeeReview(
+            id: 'review',
+            reviewedAt: DateTime(2026),
+            title: 'Review',
+            reviewer: 'Manager',
+            notes: 'Notes',
+          ),
+        ),
+        throwsA(
+          isA<CandidateRepositoryException>().having(
+            (error) => error.code,
+            'code',
+            'hired_candidate_required',
+          ),
+        ),
+      );
+      await expectLater(
+        repository.saveEmploymentPlan(
+          candidate.id,
+          EmploymentPlan.propose(DateTime(2026)),
+        ),
+        throwsA(isA<CandidateRepositoryException>()),
+      );
       await repository.saveCandidate(
         candidate.copyWith(
           ratings: const {
@@ -196,119 +269,87 @@ void main() {
         ) as Map<String, Object?>,
       );
       expect(legacy.candidates.single.ratings, isEmpty);
-      final legacyJson = <String, Object?>{
-        ...RecruitingDataModel.encode(legacy),
-        'candidates': [
-          {
-            ...(RecruitingDataModel.encode(legacy)['candidates']! as List)
-                    .single
-                as Map<String, Object?>,
-            'ratings': null,
-            'interviews': [
-              {
-                'id': 'i1',
-                'stageId': 'cv_review',
-                'createdAt': '2026-01-01T00:00:00.000Z',
-                'decision': 'positive',
-                'notes': '',
-                'ratings': {'teamFit': 4.0},
-              },
-            ],
-          },
-        ],
-      };
+    },
+  );
+
+  test(
+    'migrates an old pipeline once and resets candidates to CV review',
+    () async {
+      final repository = createRepository();
+      final candidate = _candidate('migration');
+      final base = RecruitingDataModel.encode(
+        RecruitingData.initial().copyWith(
+          candidates: [candidate.copyWith(stageId: 'technical')],
+        ),
+      );
+      base['version'] = 1;
+      final migrated = RecruitingDataModel.decode(base);
+      expect(migrated.candidates.single.stageId, 'new');
+      expect(migrated.candidates.single.interviews, isEmpty);
+      expect(migrated.stages.map((stage) => stage.id), [
+        'new',
+        'screening',
+        'technical',
+        'final',
+        'offer',
+        'hired',
+        'rejected',
+      ]);
+      await vaultDirectory.create(recursive: true);
+      await File('${vaultDirectory.path}\\recruiting.vault').writeAsBytes(
+        await AesGcmVaultCipher(keyStore)
+            .encrypt(utf8.encode(jsonEncode(base))),
+      );
+      await repository.load();
+      await repository.saveInterviewFeedback(
+        candidate.id,
+        stageId: 'new',
+        decision: FeedbackDecision.pending,
+        notes: 'Reviewed.',
+      );
+      await repository.moveCandidate(candidate.id, 'screening');
       expect(
-        RecruitingDataModel.decode(legacyJson)
-            .candidates
-            .single
-            .ratings[RatingAspect.teamFit],
-        4,
+        (await createRepository().load()).candidates.single.stageId,
+        'screening',
       );
     },
   );
 
-  test('keeps one editable feedback per stage', () async {
+  test('rejects only after negative feedback is communicated', () async {
     final repository = createRepository();
-    final candidate = _candidate('candidate-edit');
+    final candidate = _candidate('reject');
     await repository.saveCandidate(candidate);
-    await repository.moveCandidate(candidate.id, 'cv_review');
     await repository.saveInterviewFeedback(
       candidate.id,
-      stageId: 'cv_review',
-      decision: FeedbackDecision.neutral,
-      notes: 'First impression.',
-    );
-    await repository.saveInterviewFeedback(
-      candidate.id,
-      stageId: 'cv_review',
-      decision: FeedbackDecision.positive,
-      notes: 'Updated after review.',
+      stageId: 'new',
+      decision: FeedbackDecision.pending,
+      notes: 'Reviewed.',
     );
     await repository.moveCandidate(candidate.id, 'screening');
-
-    // Past stages stay editable, but never gain a second record.
     await repository.saveInterviewFeedback(
       candidate.id,
-      stageId: 'cv_review',
+      stageId: 'screening',
       decision: FeedbackDecision.negative,
-      notes: 'Changed my mind.',
+      notes: 'Role mismatch.',
+      scheduledAt: DateTime.utc(2026),
+      interviewer: 'Recruiter',
     );
-    final interviews = (await repository.load()).candidates.single.interviews;
-    expect(interviews, hasLength(1));
-    expect(interviews.single.decision, FeedbackDecision.negative);
-    expect(interviews.single.notes, 'Changed my mind.');
-
     await expectLater(
-      repository.saveInterviewFeedback(
-        candidate.id,
-        stageId: 'technical',
-        decision: FeedbackDecision.positive,
-        notes: '',
-      ),
+      repository.moveCandidate(candidate.id, 'rejected'),
       throwsA(isA<CandidateRepositoryException>()),
     );
-  });
-
-  test('merges legacy duplicate feedbacks of a stage when loading', () {
-    final base = RecruitingDataModel.encode(
-      RecruitingData(
-        candidates: [_candidate('candidate-legacy')],
-        sources: RecruitingData.initial().sources,
-        stages: RecruitingData.initial().stages,
-        favorites: const [],
-      ),
+    await repository.saveInterviewFeedback(
+      candidate.id,
+      stageId: 'screening',
+      decision: FeedbackDecision.negative,
+      notes: 'Role mismatch.',
+      feedbackSharedWithCandidate: true,
     );
-    Map<String, Object?> record(
-      String id,
-      String day,
-      String decision,
-      String notes,
-    ) => {
-      'id': id,
-      'stageId': 'cv_review',
-      'createdAt': '2026-01-${day}T00:00:00.000Z',
-      'decision': decision,
-      'notes': notes,
-    };
-    final json = <String, Object?>{
-      ...base,
-      'candidates': [
-        {
-          ...(base['candidates']! as List).single as Map<String, Object?>,
-          'interviews': [
-            record('b', '02', 'positive', 'Second.'),
-            record('a', '01', 'neutral', 'First.'),
-          ],
-        },
-      ],
-    };
-    final interviews = RecruitingDataModel.decode(json)
-        .candidates
-        .single
-        .interviews;
-    expect(interviews, hasLength(1));
-    expect(interviews.single.decision, FeedbackDecision.positive);
-    expect(interviews.single.notes, 'First.\n\nSecond.');
+    await repository.moveCandidate(candidate.id, 'rejected');
+    expect(
+      (await createRepository().load()).candidates.single.stageId,
+      'rejected',
+    );
   });
 
   test('does not accept feedback for the first step', () async {
@@ -334,13 +375,19 @@ void main() {
       cvBytes: utf8.encode('first'),
     );
     expect(created.stageId, 'new');
-    await repository.moveCandidate(candidate.id, 'cv_review');
+    await repository.saveInterviewFeedback(
+      candidate.id,
+      stageId: 'new',
+      decision: FeedbackDecision.pending,
+      notes: 'Reviewed.',
+    );
+    await repository.moveCandidate(candidate.id, 'screening');
     final edited = await repository.saveCandidate(
       created.copyWith(stageId: 'new', firstName: 'Grace'),
       cvBytes: utf8.encode('second'),
     );
 
-    expect(edited.stageId, 'cv_review');
+    expect(edited.stageId, 'screening');
     expect(edited.cvStorageKey, isNot(created.cvStorageKey));
     expect(
       File('${vaultDirectory.path}\\${created.cvStorageKey}.cv.enc')

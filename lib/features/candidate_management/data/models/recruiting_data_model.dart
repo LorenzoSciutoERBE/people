@@ -1,10 +1,11 @@
 import '../../domain/entities/recruiting_data.dart';
+import '../../domain/entities/employment_plan.dart';
 
 class RecruitingDataModel {
   const RecruitingDataModel._();
 
   static Map<String, Object?> encode(RecruitingData data) => <String, Object?>{
-    'version': 1,
+    'version': 2,
     'candidates': data.candidates.map(_encodeCandidate).toList(),
     'favorites': data.favorites.map(_encodeFavorite).toList(),
     'sources': data.sources.map(_encodeSource).toList(),
@@ -12,12 +13,22 @@ class RecruitingDataModel {
   };
 
   static RecruitingData decode(Map<String, Object?> json) {
-    if (json['version'] != 1) {
+    if (json['version'] != 1 && json['version'] != 2) {
       throw const FormatException('Unsupported recruiting data version.');
     }
     return RecruitingData(
       candidates: _objects(json['candidates'])
-          .map(_decodeCandidate)
+          .map((value) {
+            if (json['version'] == 1) {
+              value = {
+                ...value,
+                'stageId': 'new',
+                'interviews': <Object?>[],
+                'offer': null,
+              };
+            }
+            return _decodeCandidate(value);
+          })
           .toList(growable: false),
       favorites: json['favorites'] == null
           ? const <FavoriteTalent>[]
@@ -27,9 +38,9 @@ class RecruitingDataModel {
       sources: _objects(json['sources'])
           .map(_decodeSource)
           .toList(growable: false),
-      stages: _objects(json['stages'])
-          .map(_decodeStage)
-          .toList(growable: false),
+      stages: json['version'] == 1
+          ? RecruitingData.initial().stages
+          : _objects(json['stages']).map(_decodeStage).toList(growable: false),
     );
   }
 
@@ -53,8 +64,11 @@ class RecruitingDataModel {
     'updatedAt': value.updatedAt.toIso8601String(),
     'cvFileName': value.cvFileName,
     'cvStorageKey': value.cvStorageKey,
-    'cvExtractedText': value.cvExtractedText,
     'interviews': value.interviews.map(_encodeInterview).toList(),
+    'reviews': value.reviews.map(_encodeReview).toList(),
+    'employmentPlan': value.employmentPlan == null
+        ? null
+        : _encodeEmploymentPlan(value.employmentPlan!),
     'ratings': <String, Object?>{
       for (final entry in value.ratings.entries) entry.key.name: entry.value,
     },
@@ -79,58 +93,18 @@ class RecruitingDataModel {
     updatedAt: DateTime.parse(_string(json, 'updatedAt')),
     cvFileName: json['cvFileName'] as String?,
     cvStorageKey: json['cvStorageKey'] as String?,
-    cvExtractedText: _string(json, 'cvExtractedText'),
-    interviews: _singleRecordPerStage(
-      _objects(json['interviews']).map(_decodeInterview).toList(),
-    ),
-    ratings: json['ratings'] == null
-        ? _legacyRatings(json['interviews'])
-        : _decodeRatings(json['ratings']),
+    employmentPlan: json['employmentPlan'] == null
+        ? null
+        : _decodeEmploymentPlan(_object(json['employmentPlan'])),
+    reviews: json['reviews'] == null
+        ? const <EmployeeReview>[]
+        : _objects(json['reviews']).map(_decodeReview).toList(growable: false),
+    interviews: _objects(json['interviews'])
+        .map(_decodeInterview)
+        .toList(growable: false),
+    ratings: _decodeRatings(json['ratings']),
     offer: json['offer'] == null ? null : _decodeOffer(_object(json['offer'])),
   );
-
-  // Older data could hold several feedbacks per stage. Merge them into one:
-  // the latest decision wins and every non-empty note is kept in order.
-  static List<InterviewRecord> _singleRecordPerStage(
-    List<InterviewRecord> records,
-  ) {
-    final sorted = [...records]
-      ..sort((first, second) => first.createdAt.compareTo(second.createdAt));
-    final byStage = <String, List<InterviewRecord>>{};
-    for (final record in sorted) {
-      byStage
-          .putIfAbsent(record.stageId, () => <InterviewRecord>[])
-          .add(record);
-    }
-    return <InterviewRecord>[
-      for (final group in byStage.values)
-        InterviewRecord(
-          id: group.last.id,
-          stageId: group.last.stageId,
-          createdAt: group.first.createdAt,
-          decision: group.last.decision,
-          notes: group
-              .map((record) => record.notes)
-              .where((notes) => notes.isNotEmpty)
-              .join('\n\n'),
-        ),
-    ];
-  }
-
-  // Ratings used to live on each interview; keep the most recent per aspect.
-  static Map<RatingAspect, double> _legacyRatings(Object? interviews) {
-    final records = _objects(interviews)
-      ..sort(
-        (first, second) =>
-            DateTime.parse(_string(first, 'createdAt'))
-                .compareTo(DateTime.parse(_string(second, 'createdAt'))),
-      );
-    final merged = <RatingAspect, double>{};
-    for (final record in records) {
-      merged.addAll(_decodeRatings(record['ratings']));
-    }
-    return merged;
-  }
 
   static Map<String, Object?> _encodeInterview(InterviewRecord value) =>
       <String, Object?>{
@@ -139,6 +113,9 @@ class RecruitingDataModel {
         'createdAt': value.createdAt.toIso8601String(),
         'decision': value.decision.name,
         'notes': value.notes,
+        'feedbackSharedWithCandidate': value.feedbackSharedWithCandidate,
+        'scheduledAt': value.scheduledAt?.toIso8601String(),
+        'interviewer': value.interviewer,
       };
 
   static InterviewRecord _decodeInterview(Map<String, Object?> json) =>
@@ -148,6 +125,59 @@ class RecruitingDataModel {
         createdAt: DateTime.parse(_string(json, 'createdAt')),
         decision: _enum(FeedbackDecision.values, json, 'decision'),
         notes: _string(json, 'notes'),
+        feedbackSharedWithCandidate:
+            json['feedbackSharedWithCandidate'] == true,
+        scheduledAt: json['scheduledAt'] == null
+            ? null
+            : DateTime.parse(_string(json, 'scheduledAt')),
+        interviewer: json['interviewer'] as String? ?? '',
+      );
+
+  static Map<String, Object?> _encodeEmploymentPlan(EmploymentPlan plan) => {
+    'hiredAt': plan.hiredAt.toIso8601String(),
+    'followUps': [
+      for (final meeting in plan.followUps)
+        {
+          'monthsAfterHiring': meeting.monthsAfterHiring,
+          'scheduledAt': meeting.scheduledAt.toIso8601String(),
+          'completed': meeting.completed,
+        },
+    ],
+  };
+
+  static EmploymentPlan _decodeEmploymentPlan(Map<String, Object?> json) {
+    final plan = EmploymentPlan(
+      hiredAt: DateTime.parse(_string(json, 'hiredAt')),
+      followUps: [
+        for (final meeting in _objects(json['followUps']))
+          EmploymentFollowUp(
+            monthsAfterHiring: _int(meeting, 'monthsAfterHiring'),
+            scheduledAt: DateTime.parse(_string(meeting, 'scheduledAt')),
+            completed: _bool(meeting, 'completed'),
+          ),
+      ],
+    );
+    if (!plan.isValid) throw const FormatException('Invalid employment plan.');
+    return plan;
+  }
+
+  static Map<String, Object?> _encodeReview(EmployeeReview value) => {
+    'id': value.id,
+    'reviewedAt': value.reviewedAt.toIso8601String(),
+    'reviewer': value.reviewer,
+    'title': value.title,
+    'notes': value.notes,
+    'goals': value.goals,
+  };
+
+  static EmployeeReview _decodeReview(Map<String, Object?> json) =>
+      EmployeeReview(
+        id: _string(json, 'id'),
+        reviewedAt: DateTime.parse(_string(json, 'reviewedAt')),
+        reviewer: _string(json, 'reviewer'),
+        title: _string(json, 'title'),
+        notes: _string(json, 'notes'),
+        goals: _string(json, 'goals'),
       );
 
   static Map<RatingAspect, double> _decodeRatings(Object? value) {
