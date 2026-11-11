@@ -2,7 +2,13 @@ import 'recruiting_data.dart';
 
 enum CandidateSort { recentlyUpdated, name, stage }
 
-enum CandidateFeedbackFilter { any, missing, positive, neutral, negative }
+enum CandidateFeedbackFilter {
+  any,
+  missing,
+  positive,
+  negative,
+  communicationPending,
+}
 
 /// Search, filter and sort criteria for the candidate list.
 class CandidateListFilter {
@@ -54,7 +60,15 @@ class CandidateListFilter {
     };
     final needle = text.trim().toLowerCase();
     final result = candidates
-        .where((candidate) => _matches(candidate, needle))
+        .where(
+          (candidate) => _matches(
+            candidate,
+            needle,
+            isInterview: stages.any(
+              (stage) => stage.id == candidate.stageId && stage.isInterview,
+            ),
+          ),
+        )
         .toList();
     result.sort(switch (sort) {
       CandidateSort.recentlyUpdated => (a, b) => b.updatedAt.compareTo(
@@ -70,11 +84,15 @@ class CandidateListFilter {
     return result;
   }
 
-  bool _matches(Candidate candidate, String needle) {
+  bool _matches(
+    Candidate candidate,
+    String needle, {
+    required bool isInterview,
+  }) {
     if (stageId != null && candidate.stageId != stageId) return false;
     if (sourceId != null && candidate.sourceId != sourceId) return false;
     if (withResumeOnly && !candidate.hasResume) return false;
-    if (!_matchesFeedback(candidate)) return false;
+    if (!_matchesFeedback(candidate, isInterview: isInterview)) return false;
     if (needle.isEmpty) return true;
     final haystack = <String>[
       candidate.fullName,
@@ -86,15 +104,21 @@ class CandidateListFilter {
     return needle.split(RegExp(r'\s+')).every(haystack.contains);
   }
 
-  bool _matchesFeedback(Candidate candidate) {
+  bool _matchesFeedback(Candidate candidate, {required bool isInterview}) {
     if (feedback == CandidateFeedbackFilter.any) return true;
     final decision = candidate.latestFeedbackFor(candidate.stageId)?.decision;
     return switch (feedback) {
       CandidateFeedbackFilter.any => true,
       CandidateFeedbackFilter.missing =>
-        decision == null || decision == FeedbackDecision.pending,
+        isInterview &&
+            (decision == null || decision == FeedbackDecision.pending),
       CandidateFeedbackFilter.positive => decision == FeedbackDecision.positive,
-      CandidateFeedbackFilter.neutral => decision == FeedbackDecision.neutral,
+      CandidateFeedbackFilter.communicationPending => candidate.interviews.any(
+        (record) =>
+            record.stageId != 'new' &&
+            record.decision != FeedbackDecision.pending &&
+            !record.feedbackSharedWithCandidate,
+      ),
       CandidateFeedbackFilter.negative => decision == FeedbackDecision.negative,
     };
   }

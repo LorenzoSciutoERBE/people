@@ -5,6 +5,8 @@ import 'package:uuid/uuid.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../domain/entities/recruiting_data.dart';
 import '../providers/candidate_management_providers.dart';
+import 'candidate_dialog_support.dart';
+import 'candidate_status_widgets.dart';
 
 extension on TextEditingController {
   /// Defers disposal until the widgets using this controller are rebuilt.
@@ -76,8 +78,10 @@ class _RecruitingSettingsState extends ConsumerState<RecruitingSettings> {
           ),
         );
       },
-      error: (error, stackTrace) =>
-          Center(child: Text(localization.candidateActionFailed)),
+      error: (error, stackTrace) => CandidateErrorPanel(
+        message: localization.candidateActionFailed,
+        onRetry: () => ref.invalidate(candidateManagementControllerProvider),
+      ),
       loading: () => const Center(child: CircularProgressIndicator()),
     );
   }
@@ -144,11 +148,6 @@ class _RecruitingSettingsState extends ConsumerState<RecruitingSettings> {
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
               ),
-              TextButton.icon(
-                onPressed: _addStage,
-                icon: const Icon(Icons.add),
-                label: Text(localization.candidateStageAdd),
-              ),
             ],
           ),
           for (var index = 0; index < (_stages?.length ?? 0); index++)
@@ -160,40 +159,38 @@ class _RecruitingSettingsState extends ConsumerState<RecruitingSettings> {
 
   Widget _stageRow(AppLocalizations localization, int index) {
     final stage = _stages![index];
-    final isTerminal =
-        stage.terminalOutcome != TerminalOutcome.active ||
-        stage.isOfferStage ||
-        stage.id == 'new';
+    final accent = stageAccentColor(context, stage);
     return Padding(
       padding: const EdgeInsets.only(top: 10),
       child: Row(
         children: [
+          Container(
+            width: 28,
+            height: 28,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: accent.withValues(alpha: 0.14),
+              shape: BoxShape.circle,
+            ),
+            child: Text(
+              '${index + 1}',
+              style: Theme.of(context).textTheme.labelMedium
+                  ?.copyWith(color: accent, fontWeight: FontWeight.w700),
+            ),
+          ),
+          const SizedBox(width: 12),
           Expanded(
             child: TextField(
               controller: _stageControllers[stage.id],
               decoration: InputDecoration(
                 labelText: localization.candidateSettingName,
+                suffixIcon: Icon(
+                  Icons.lock_outline,
+                  size: 16,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
               ),
             ),
-          ),
-          IconButton(
-            tooltip: localization.candidateStageMoveUp,
-            onPressed: index == 0 ? null : () => _moveStage(index, index - 1),
-            icon: const Icon(Icons.arrow_upward),
-          ),
-          IconButton(
-            tooltip: localization.candidateStageMoveDown,
-            onPressed: index == _stages!.length - 1
-                ? null
-                : () => _moveStage(index, index + 1),
-            icon: const Icon(Icons.arrow_downward),
-          ),
-          IconButton(
-            tooltip: localization.candidateDelete,
-            onPressed: isTerminal || stage.isOfferStage
-                ? null
-                : () => _removeStage(stage.id),
-            icon: const Icon(Icons.delete_outline),
           ),
         ],
       ),
@@ -203,94 +200,18 @@ class _RecruitingSettingsState extends ConsumerState<RecruitingSettings> {
   void _initializeIfNeeded(RecruitingData data, AppLocalizations localization) {
     if (_sources != null && _stages != null) return;
     _sources = [...data.sources];
-    _stages = [...data.stages]
-      ..sort((first, second) => first.order.compareTo(second.order));
+    _stages = data.orderedStages;
     for (final source in data.sources) {
       _sourceControllers[source.id] = TextEditingController(
-        text: _localizedSourceName(localization, source),
+        text: localizedSourceName(localization, source),
       );
     }
     for (final stage in data.stages) {
       _stageControllers[stage.id] = TextEditingController(
-        text: _localizedStageName(localization, stage),
+        text: localizedStageName(localization, stage),
       );
     }
   }
-
-  String _localizedSourceName(
-    AppLocalizations localization,
-    CandidateSource source,
-  ) {
-    final defaultName = _defaultSourceName(source.id);
-    return defaultName != null && source.name == defaultName
-        ? _localizedSourceDefault(localization, source.id)
-        : source.name;
-  }
-
-  String _localizedStageName(AppLocalizations localization, HiringStage stage) {
-    final defaultName = _defaultStageName(stage.id);
-    return defaultName != null && stage.name == defaultName
-        ? _localizedStageDefault(localization, stage.id)
-        : stage.name;
-  }
-
-  String _storedSourceName(
-    String id,
-    String editedName,
-    AppLocalizations localization,
-  ) => editedName == _localizedSourceDefault(localization, id)
-      ? _defaultSourceName(id) ?? editedName
-      : editedName;
-
-  String _storedStageName(
-    String id,
-    String editedName,
-    AppLocalizations localization,
-  ) => editedName == _localizedStageDefault(localization, id)
-      ? _defaultStageName(id) ?? editedName
-      : editedName;
-
-  String? _defaultSourceName(String id) => switch (id) {
-    'grafton' => 'Grafton',
-    'poli' => 'Poli',
-    'github' => 'GitHub',
-    'other' => 'Other',
-    _ => null,
-  };
-
-  String _localizedSourceDefault(AppLocalizations localization, String id) =>
-      switch (id) {
-        'grafton' => localization.candidateDefaultGrafton,
-        'poli' => localization.candidateDefaultPoli,
-        'github' => localization.candidateDefaultGithub,
-        'other' => localization.candidateDefaultOther,
-        _ => '',
-      };
-
-  String? _defaultStageName(String id) => switch (id) {
-    'new' => 'New',
-    'cv_review' => 'CV review',
-    'screening' => 'Screening interview',
-    'technical' => 'Technical interview',
-    'final' => 'Final interview',
-    'offer' => 'Offer / pre-contract',
-    'hired' => 'Hired',
-    'rejected' => 'Rejected',
-    _ => null,
-  };
-
-  String _localizedStageDefault(AppLocalizations localization, String id) =>
-      switch (id) {
-        'new' => localization.candidateDefaultNew,
-        'cv_review' => localization.candidateDefaultCvReview,
-        'screening' => localization.candidateDefaultScreening,
-        'technical' => localization.candidateDefaultTechnical,
-        'final' => localization.candidateDefaultFinal,
-        'offer' => localization.candidateDefaultOffer,
-        'hired' => localization.candidateDefaultHired,
-        'rejected' => localization.candidateDefaultRejected,
-        _ => '',
-      };
 
   void _addSource() {
     final source = CandidateSource(id: const Uuid().v4(), name: '');
@@ -307,62 +228,17 @@ class _RecruitingSettingsState extends ConsumerState<RecruitingSettings> {
     });
   }
 
-  void _addStage() {
-    final currentStages = [...?_stages];
-    final offerIndex = currentStages.indexWhere((stage) => stage.isOfferStage);
-    final stage = HiringStage(id: const Uuid().v4(), name: '', order: 0);
-    currentStages.insert(
-      offerIndex < 0 ? currentStages.length : offerIndex,
-      stage,
-    );
-    setState(() {
-      _stages = currentStages;
-      _stageControllers[stage.id] = TextEditingController();
-      _reindexStages();
-    });
-  }
-
-  void _removeStage(String id) {
-    setState(() {
-      _stages = _stages!.where((stage) => stage.id != id).toList();
-      _stageControllers.remove(id)?.disposeAfterFrame();
-      _reindexStages();
-    });
-  }
-
-  void _moveStage(int from, int to) {
-    setState(() {
-      final stages = [...?_stages];
-      final moved = stages.removeAt(from);
-      stages.insert(to, moved);
-      _stages = stages;
-      _reindexStages();
-    });
-  }
-
-  void _reindexStages() {
-    _stages = <HiringStage>[
-      for (var index = 0; index < _stages!.length; index++)
-        HiringStage(
-          id: _stages![index].id,
-          name: _stages![index].name,
-          order: index,
-          isOfferStage: _stages![index].isOfferStage,
-          terminalOutcome: _stages![index].terminalOutcome,
-        ),
-    ];
-  }
-
   Future<void> _save() async {
+    final localization = AppLocalizations.of(context);
     setState(() => _saving = true);
     final sources = <CandidateSource>[
       for (final source in _sources ?? const <CandidateSource>[])
         CandidateSource(
           id: source.id,
-          name: _storedSourceName(
+          name: storedSourceName(
             source.id,
             _sourceControllers[source.id]!.text.trim(),
-            AppLocalizations.of(context),
+            localization,
           ),
           isActive: source.isActive,
         ),
@@ -371,10 +247,10 @@ class _RecruitingSettingsState extends ConsumerState<RecruitingSettings> {
       for (final stage in _stages ?? const <HiringStage>[])
         HiringStage(
           id: stage.id,
-          name: _storedStageName(
+          name: storedStageName(
             stage.id,
             _stageControllers[stage.id]!.text.trim(),
-            AppLocalizations.of(context),
+            localization,
           ),
           order: stage.order,
           isOfferStage: stage.isOfferStage,
@@ -401,17 +277,9 @@ class _RecruitingSettingsState extends ConsumerState<RecruitingSettings> {
         });
       }
     } on Object {
-      if (mounted) _showError();
+      if (mounted) showCandidateActionError(context);
     } finally {
       if (mounted) setState(() => _saving = false);
     }
-  }
-
-  void _showError() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(AppLocalizations.of(context).candidateActionFailed),
-      ),
-    );
   }
 }

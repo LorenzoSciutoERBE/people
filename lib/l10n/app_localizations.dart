@@ -98,6 +98,258 @@ abstract class AppLocalizations {
     Locale('it'),
   ];
 
+  /// No description provided for @candidateAcceptedOfferRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Save an offer with status Accepted before hiring this candidate. A positive decision alone is not enough.'**
+  String get candidateAcceptedOfferRequired;
+
+  /// No description provided for @candidateOfferStageRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Move this candidate to the offer stage before confirming hiring.'**
+  String get candidateOfferStageRequired;
+
+  /// No description provided for @candidateOfferMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'No offer saved'**
+  String get candidateOfferMissing;
+
+  /// No description provided for @employmentRemindersCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} follow-up meetings need your attention'**
+  String employmentRemindersCount(int count);
+
+  /// No description provided for @employmentPlanTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Hiring date and follow-up meetings'**
+  String get employmentPlanTitle;
+
+  /// No description provided for @employmentHiringDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Hiring date'**
+  String get employmentHiringDate;
+
+  /// No description provided for @employmentPlanDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Suggested 1-hour meetings from 15:00 to 16:00, 1, 3, 6, and 12 months after hiring. Select a meeting to change its date or start time.'**
+  String get employmentPlanDescription;
+
+  /// No description provided for @employmentSaveExplanation.
+  ///
+  /// In en, this message translates to:
+  /// **'Save the hiring date and follow-up meetings for this person.'**
+  String get employmentSaveExplanation;
+
+  /// No description provided for @employmentHireExplanation.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm hiring to move this candidate to Hired people and save these meetings. An accepted offer and a positive decision in the offer stage are required.'**
+  String get employmentHireExplanation;
+
+  /// No description provided for @employmentExportOnSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Also export a calendar file (.ics)'**
+  String get employmentExportOnSave;
+
+  /// No description provided for @employmentExportExplanation.
+  ///
+  /// In en, this message translates to:
+  /// **'After saving, choose where to save the file, then import it into your calendar. Canceling the file dialog keeps your changes saved in People.'**
+  String get employmentExportExplanation;
+
+  /// No description provided for @employmentPlanSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Hiring date and follow-up meetings saved.'**
+  String get employmentPlanSaved;
+
+  /// No description provided for @employmentHireSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Hiring confirmed. You can find this person and their meetings in Hired people.'**
+  String get employmentHireSaved;
+
+  /// No description provided for @employmentMilestone.
+  ///
+  /// In en, this message translates to:
+  /// **'{months}-month follow-up'**
+  String employmentMilestone(int months);
+
+  /// No description provided for @employmentPlanSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save meeting plan'**
+  String get employmentPlanSave;
+
+  /// No description provided for @employmentHireAndPlan.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm hiring'**
+  String get employmentHireAndPlan;
+
+  /// No description provided for @employmentPlanEdit.
+  ///
+  /// In en, this message translates to:
+  /// **'Plan follow-up meetings'**
+  String get employmentPlanEdit;
+
+  /// No description provided for @employmentExportCalendar.
+  ///
+  /// In en, this message translates to:
+  /// **'Export calendar (.ics)'**
+  String get employmentExportCalendar;
+
+  /// No description provided for @employmentCalendarSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Calendar file saved. Import it into your calendar to schedule meetings and receive reminders.'**
+  String get employmentCalendarSaved;
+
+  /// No description provided for @employmentCalendarExportFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Your changes are saved in People, but the calendar file could not be exported. Try Export calendar again from Hired people and choose a writable folder.'**
+  String get employmentCalendarExportFailed;
+
+  /// No description provided for @employmentPlanInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Each follow-up must be on or after the hiring date.'**
+  String get employmentPlanInvalid;
+
+  /// No description provided for @employmentMeetingCompleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Completed'**
+  String get employmentMeetingCompleted;
+
+  /// No description provided for @employmentUpcoming.
+  ///
+  /// In en, this message translates to:
+  /// **'Upcoming and overdue follow-ups'**
+  String get employmentUpcoming;
+
+  /// No description provided for @employmentOverdue.
+  ///
+  /// In en, this message translates to:
+  /// **'Overdue'**
+  String get employmentOverdue;
+
+  /// No description provided for @employmentRemindersInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'In-app reminders show meetings due within 7 days and overdue meetings. Calendar exports include reminders 1 day and 15 minutes before each meeting.'**
+  String get employmentRemindersInfo;
+
+  /// No description provided for @hiredPeopleTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Hired people'**
+  String get hiredPeopleTitle;
+
+  /// No description provided for @hiredPeopleSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep recruiting history and ongoing reviews together.'**
+  String get hiredPeopleSubtitle;
+
+  /// No description provided for @hiredPeopleEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No hired people yet. People appear here after reaching a hired stage.'**
+  String get hiredPeopleEmpty;
+
+  /// No description provided for @hiredPeopleSearch.
+  ///
+  /// In en, this message translates to:
+  /// **'Search hired people'**
+  String get hiredPeopleSearch;
+
+  /// No description provided for @employeeReviewsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Review history'**
+  String get employeeReviewsTitle;
+
+  /// No description provided for @employeeReviewsEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No ongoing reviews yet. Add the first review to start the history.'**
+  String get employeeReviewsEmpty;
+
+  /// No description provided for @employeeReviewsHidden.
+  ///
+  /// In en, this message translates to:
+  /// **'Reviews are hidden. Use Show evaluations in the header to view them.'**
+  String get employeeReviewsHidden;
+
+  /// No description provided for @employeeAddReview.
+  ///
+  /// In en, this message translates to:
+  /// **'Add review'**
+  String get employeeAddReview;
+
+  /// No description provided for @employeeEditReview.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit review'**
+  String get employeeEditReview;
+
+  /// No description provided for @employeeReviewTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Review title'**
+  String get employeeReviewTitle;
+
+  /// No description provided for @employeeReviewer.
+  ///
+  /// In en, this message translates to:
+  /// **'Reviewer'**
+  String get employeeReviewer;
+
+  /// No description provided for @employeeReviewDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Review date'**
+  String get employeeReviewDate;
+
+  /// No description provided for @employeeReviewNotes.
+  ///
+  /// In en, this message translates to:
+  /// **'Discussion and feedback'**
+  String get employeeReviewNotes;
+
+  /// No description provided for @employeeReviewGoals.
+  ///
+  /// In en, this message translates to:
+  /// **'Goals and follow-up actions'**
+  String get employeeReviewGoals;
+
+  /// No description provided for @employeeReviewRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Complete the title, reviewer, and discussion before saving.'**
+  String get employeeReviewRequired;
+
+  /// No description provided for @employeeReviewSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Review saved.'**
+  String get employeeReviewSaved;
+
+  /// No description provided for @employeeRecruitingHistory.
+  ///
+  /// In en, this message translates to:
+  /// **'Recruiting history'**
+  String get employeeRecruitingHistory;
+
   /// No description provided for @appTitle.
   ///
   /// In en, this message translates to:
@@ -143,13 +395,13 @@ abstract class AppLocalizations {
   /// No description provided for @candidateMoveForwardBlocked.
   ///
   /// In en, this message translates to:
-  /// **'Record a positive or neutral decision for the current stage before continuing.'**
+  /// **'Record positive interviewer feedback before advancing.'**
   String get candidateMoveForwardBlocked;
 
   /// No description provided for @candidateRejectBlocked.
   ///
   /// In en, this message translates to:
-  /// **'Record a negative or neutral decision for the current stage before rejecting this candidate.'**
+  /// **'Record negative interviewer feedback before rejecting.'**
   String get candidateRejectBlocked;
 
   /// No description provided for @candidateHireBlocked.
@@ -638,6 +890,18 @@ abstract class AppLocalizations {
   /// **'CV text extracted. Review the suggested details before saving.'**
   String get candidateOcrApplied;
 
+  /// No description provided for @candidateOcrTextPreview.
+  ///
+  /// In en, this message translates to:
+  /// **'Review extracted text'**
+  String get candidateOcrTextPreview;
+
+  /// No description provided for @candidateOcrNoContacts.
+  ///
+  /// In en, this message translates to:
+  /// **'Text was extracted, but no name or email was identified. Review the extracted text and enter the contact details manually.'**
+  String get candidateOcrNoContacts;
+
   /// No description provided for @candidateOcrNoText.
   ///
   /// In en, this message translates to:
@@ -659,7 +923,7 @@ abstract class AppLocalizations {
   /// No description provided for @candidateFeedback.
   ///
   /// In en, this message translates to:
-  /// **'Interview feedback'**
+  /// **'Interview & feedback'**
   String get candidateFeedback;
 
   /// No description provided for @candidateFeedbackRequired.
@@ -671,7 +935,7 @@ abstract class AppLocalizations {
   /// No description provided for @candidateFeedbackMissing.
   ///
   /// In en, this message translates to:
-  /// **'No decision recorded for this stage'**
+  /// **'Awaiting decision'**
   String get candidateFeedbackMissing;
 
   /// No description provided for @candidateFeedbackPositive.
@@ -685,12 +949,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Negative'**
   String get candidateFeedbackNegative;
-
-  /// No description provided for @candidateFeedbackNeutral.
-  ///
-  /// In en, this message translates to:
-  /// **'Neutral'**
-  String get candidateFeedbackNeutral;
 
   /// No description provided for @candidateOverallDecision.
   ///
@@ -758,6 +1016,12 @@ abstract class AppLocalizations {
   /// **'Save feedback'**
   String get candidateFeedbackSave;
 
+  /// No description provided for @candidateFeedbackDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Interview date'**
+  String get candidateFeedbackDate;
+
   /// No description provided for @candidateFeedbackNotes.
   ///
   /// In en, this message translates to:
@@ -767,7 +1031,7 @@ abstract class AppLocalizations {
   /// No description provided for @candidateFeedbackHistory.
   ///
   /// In en, this message translates to:
-  /// **'Interview history'**
+  /// **'Hiring activity'**
   String get candidateFeedbackHistory;
 
   /// No description provided for @candidateFeedbackNone.
@@ -781,12 +1045,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Feedback saved'**
   String get candidateFeedbackSaved;
-
-  /// No description provided for @candidateMoveBlocked.
-  ///
-  /// In en, this message translates to:
-  /// **'A positive decision for the current stage is required before moving forward.'**
-  String get candidateMoveBlocked;
 
   /// No description provided for @candidateOffer.
   ///
@@ -883,24 +1141,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Add source'**
   String get candidateSourceAdd;
-
-  /// No description provided for @candidateStageAdd.
-  ///
-  /// In en, this message translates to:
-  /// **'Add stage'**
-  String get candidateStageAdd;
-
-  /// No description provided for @candidateStageMoveUp.
-  ///
-  /// In en, this message translates to:
-  /// **'Move stage up'**
-  String get candidateStageMoveUp;
-
-  /// No description provided for @candidateStageMoveDown.
-  ///
-  /// In en, this message translates to:
-  /// **'Move stage down'**
-  String get candidateStageMoveDown;
 
   /// No description provided for @candidateAddFromScouting.
   ///
@@ -1043,7 +1283,7 @@ abstract class AppLocalizations {
   /// No description provided for @candidateStatPending.
   ///
   /// In en, this message translates to:
-  /// **'Feedback pending'**
+  /// **'Candidate feedback pending'**
   String get candidateStatPending;
 
   /// No description provided for @candidateStatTotal.
@@ -1094,12 +1334,6 @@ abstract class AppLocalizations {
   /// **'Remove from favorites'**
   String get recruitingRemoveFavorite;
 
-  /// No description provided for @recruitingAddFavoriteCandidate.
-  ///
-  /// In en, this message translates to:
-  /// **'Add to candidates'**
-  String get recruitingAddFavoriteCandidate;
-
   /// No description provided for @recruitingFavoriteSaved.
   ///
   /// In en, this message translates to:
@@ -1121,19 +1355,13 @@ abstract class AppLocalizations {
   /// No description provided for @candidateDefaultNew.
   ///
   /// In en, this message translates to:
-  /// **'New'**
-  String get candidateDefaultNew;
-
-  /// No description provided for @candidateDefaultCvReview.
-  ///
-  /// In en, this message translates to:
   /// **'CV review'**
-  String get candidateDefaultCvReview;
+  String get candidateDefaultNew;
 
   /// No description provided for @candidateDefaultScreening.
   ///
   /// In en, this message translates to:
-  /// **'Screening interview'**
+  /// **'Introductory interview'**
   String get candidateDefaultScreening;
 
   /// No description provided for @candidateDefaultTechnical.
@@ -1145,13 +1373,13 @@ abstract class AppLocalizations {
   /// No description provided for @candidateDefaultFinal.
   ///
   /// In en, this message translates to:
-  /// **'Final interview'**
+  /// **'Germany interview'**
   String get candidateDefaultFinal;
 
   /// No description provided for @candidateDefaultOffer.
   ///
   /// In en, this message translates to:
-  /// **'Offer / pre-contract'**
+  /// **'Offer'**
   String get candidateDefaultOffer;
 
   /// No description provided for @candidateDefaultHired.
@@ -1207,6 +1435,180 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Unable to save this recruiting change. Please review the data and try again.'**
   String get candidateActionFailed;
+
+  /// No description provided for @recruitingHideEvaluations.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide evaluations'**
+  String get recruitingHideEvaluations;
+
+  /// No description provided for @recruitingShowEvaluations.
+  ///
+  /// In en, this message translates to:
+  /// **'Show evaluations'**
+  String get recruitingShowEvaluations;
+
+  /// No description provided for @candidatePersonalDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Personal details'**
+  String get candidatePersonalDetails;
+
+  /// No description provided for @candidateHiringProcess.
+  ///
+  /// In en, this message translates to:
+  /// **'Hiring process'**
+  String get candidateHiringProcess;
+
+  /// No description provided for @candidateStageEvaluation.
+  ///
+  /// In en, this message translates to:
+  /// **'Stage evaluation'**
+  String get candidateStageEvaluation;
+
+  /// No description provided for @candidateStageEvaluationsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Stage evaluations & screening'**
+  String get candidateStageEvaluationsTitle;
+
+  /// No description provided for @candidateInterviewStep.
+  ///
+  /// In en, this message translates to:
+  /// **'Interview'**
+  String get candidateInterviewStep;
+
+  /// No description provided for @candidateEvaluationDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Evaluation date'**
+  String get candidateEvaluationDate;
+
+  /// No description provided for @candidateEvaluationNotes.
+  ///
+  /// In en, this message translates to:
+  /// **'Evaluation notes'**
+  String get candidateEvaluationNotes;
+
+  /// No description provided for @candidateCurrentStageAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Current stage'**
+  String get candidateCurrentStageAction;
+
+  /// No description provided for @candidateFeedbackSentToCandidate.
+  ///
+  /// In en, this message translates to:
+  /// **'Feedback communicated to candidate'**
+  String get candidateFeedbackSentToCandidate;
+
+  /// No description provided for @candidateAdvanceStage.
+  ///
+  /// In en, this message translates to:
+  /// **'Advance to {stage}'**
+  String candidateAdvanceStage(String stage);
+
+  /// No description provided for @pipelineInterviewer.
+  ///
+  /// In en, this message translates to:
+  /// **'Interviewer / feedback owner'**
+  String get pipelineInterviewer;
+
+  /// No description provided for @pipelineSchedule.
+  ///
+  /// In en, this message translates to:
+  /// **'Schedule interview'**
+  String get pipelineSchedule;
+
+  /// No description provided for @pipelineScheduleRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Schedule the interview and assign an interviewer before recording a decision.'**
+  String get pipelineScheduleRequired;
+
+  /// No description provided for @pipelineCvRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Save your CV review notes before scheduling the introductory interview. No decision is needed at this stage.'**
+  String get pipelineCvRequired;
+
+  /// No description provided for @pipelineCommunicationRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Communicate the feedback to the candidate and mark it as shared before continuing.'**
+  String get pipelineCommunicationRequired;
+
+  /// No description provided for @pipelineFeedbackPending.
+  ///
+  /// In en, this message translates to:
+  /// **'Candidate feedback pending'**
+  String get pipelineFeedbackPending;
+
+  /// No description provided for @pipelineFeedbackShared.
+  ///
+  /// In en, this message translates to:
+  /// **'Candidate feedback shared'**
+  String get pipelineFeedbackShared;
+
+  /// No description provided for @pipelineReviewCv.
+  ///
+  /// In en, this message translates to:
+  /// **'Review CV and add initial notes'**
+  String get pipelineReviewCv;
+
+  /// No description provided for @pipelineAwaitingFeedback.
+  ///
+  /// In en, this message translates to:
+  /// **'Collect interviewer feedback'**
+  String get pipelineAwaitingFeedback;
+
+  /// No description provided for @pipelineReady.
+  ///
+  /// In en, this message translates to:
+  /// **'Ready for the next step'**
+  String get pipelineReady;
+
+  /// No description provided for @pipelineEditFeedback.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit interview & feedback'**
+  String get pipelineEditFeedback;
+
+  /// No description provided for @pipelineCurrentStep.
+  ///
+  /// In en, this message translates to:
+  /// **'CURRENT STEP'**
+  String get pipelineCurrentStep;
+
+  /// No description provided for @pipelineOutcome.
+  ///
+  /// In en, this message translates to:
+  /// **'OUTCOME'**
+  String get pipelineOutcome;
+
+  /// No description provided for @pipelineCompletedSteps.
+  ///
+  /// In en, this message translates to:
+  /// **'Previous steps'**
+  String get pipelineCompletedSteps;
+
+  /// No description provided for @pipelineCvDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Read the CV and capture your first impressions. Then arrange the introductory interview; no approval decision is needed here.'**
+  String get pipelineCvDescription;
+
+  /// No description provided for @pipelineInterviewDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Schedule the conversation, collect the interviewer’s decision, and communicate the outcome to the candidate before continuing.'**
+  String get pipelineInterviewDescription;
+
+  /// No description provided for @pipelineOfferDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Prepare and send the proposal, then record the candidate’s response. An accepted offer completes the selection process.'**
+  String get pipelineOfferDescription;
 }
 
 class _AppLocalizationsDelegate

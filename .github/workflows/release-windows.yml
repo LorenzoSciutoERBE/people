@@ -1,0 +1,97 @@
+name: Release Windows
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  package:
+    runs-on: windows-2025
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: '3.47.8'
+          cache: true
+      - name: Validate release version
+        shell: pwsh
+        env:
+          RELEASE_REF: ${{ github.ref }}
+        run: |
+          $version = (Select-String -Path pubspec.yaml -Pattern '^version: (\d+\.\d+\.\d+)\+\d+$').Matches.Groups[1].Value
+          if (-not $version) { throw 'pubspec.yaml must contain a release version.' }
+          if ($env:RELEASE_REF.StartsWith('refs/tags/') -and $env:RELEASE_REF -ne "refs/tags/v$version") {
+            throw 'The release tag must match the version in pubspec.yaml.'
+          }
+          "RELEASE_VERSION=$version" >> $env:GITHUB_ENV
+      - name: Install required OCR capabilities
+        shell: pwsh
+        run: |
+          foreach ($language in @('en-US', 'it-IT')) {
+            $name = "Language.OCR~~~$language~0.0.1.0"
+            if ((Get-WindowsCapability -Online -Name $name).State -ne 'Installed') {
+              $result = Add-WindowsCapability -Online -Name $name
+              if ($result.RestartNeeded) { throw "OCR installation requires a restart: $name" }
+            }
+          }
+      - name: Run release checks
+        shell: pwsh
+        run: ./Test-People.ps1
+      - name: Install Inno Setup
+        shell: pwsh
+        run: ./packaging/windows/Install-InnoSetup.ps1
+      - name: Build installer and portable ZIP
+        shell: pwsh
+        run: ./Build-WindowsRelease.ps1 -Version $env:RELEASE_VERSION -BuildNumber ${{ github.run_number }} -InnoSetupCompiler ./build/release-tools/inno/ISCC.exe
+      - name: Verify packaged distributions
+        shell: pwsh
+        run: ./packaging/windows/Test-WindowsPackages.ps1 -Version $env:RELEASE_VERSION
+      - uses: actions/upload-artifact@v7
+        with:
+          name: People-windows-x64
+          path: |
+            build/releases/*/*-setup.exe
+            build/releases/*/*-portable.zip
+            build/releases/*/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 30
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-test-results
+          path: build/test-results/
+          if-no-files-found: warn
+
+  publish:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: package
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: People-windows-x64
+          path: release
+      - name: Publish draft GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          mapfile -d '' files < <(find release -type f -print0)
+          gh release create "$RELEASE_TAG" "${files[@]}" --verify-tag --draft --generate-notes --title "People $RELEASE_TAG"

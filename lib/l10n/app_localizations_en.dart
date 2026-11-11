@@ -10,6 +10,152 @@ class AppLocalizationsEn extends AppLocalizations {
   AppLocalizationsEn([String locale = 'en']) : super(locale);
 
   @override
+  String get candidateAcceptedOfferRequired =>
+      'Save an offer with status Accepted before hiring this candidate. A positive decision alone is not enough.';
+
+  @override
+  String get candidateOfferStageRequired =>
+      'Move this candidate to the offer stage before confirming hiring.';
+
+  @override
+  String get candidateOfferMissing => 'No offer saved';
+
+  @override
+  String employmentRemindersCount(int count) {
+    return '$count follow-up meetings need your attention';
+  }
+
+  @override
+  String get employmentPlanTitle => 'Hiring date and follow-up meetings';
+
+  @override
+  String get employmentHiringDate => 'Hiring date';
+
+  @override
+  String get employmentPlanDescription =>
+      'Suggested 1-hour meetings from 15:00 to 16:00, 1, 3, 6, and 12 months after hiring. Select a meeting to change its date or start time.';
+
+  @override
+  String get employmentSaveExplanation =>
+      'Save the hiring date and follow-up meetings for this person.';
+
+  @override
+  String get employmentHireExplanation =>
+      'Confirm hiring to move this candidate to Hired people and save these meetings. An accepted offer and a positive decision in the offer stage are required.';
+
+  @override
+  String get employmentExportOnSave => 'Also export a calendar file (.ics)';
+
+  @override
+  String get employmentExportExplanation =>
+      'After saving, choose where to save the file, then import it into your calendar. Canceling the file dialog keeps your changes saved in People.';
+
+  @override
+  String get employmentPlanSaved => 'Hiring date and follow-up meetings saved.';
+
+  @override
+  String get employmentHireSaved =>
+      'Hiring confirmed. You can find this person and their meetings in Hired people.';
+
+  @override
+  String employmentMilestone(int months) {
+    return '$months-month follow-up';
+  }
+
+  @override
+  String get employmentPlanSave => 'Save meeting plan';
+
+  @override
+  String get employmentHireAndPlan => 'Confirm hiring';
+
+  @override
+  String get employmentPlanEdit => 'Plan follow-up meetings';
+
+  @override
+  String get employmentExportCalendar => 'Export calendar (.ics)';
+
+  @override
+  String get employmentCalendarSaved =>
+      'Calendar file saved. Import it into your calendar to schedule meetings and receive reminders.';
+
+  @override
+  String get employmentCalendarExportFailed =>
+      'Your changes are saved in People, but the calendar file could not be exported. Try Export calendar again from Hired people and choose a writable folder.';
+
+  @override
+  String get employmentPlanInvalid =>
+      'Each follow-up must be on or after the hiring date.';
+
+  @override
+  String get employmentMeetingCompleted => 'Completed';
+
+  @override
+  String get employmentUpcoming => 'Upcoming and overdue follow-ups';
+
+  @override
+  String get employmentOverdue => 'Overdue';
+
+  @override
+  String get employmentRemindersInfo =>
+      'In-app reminders show meetings due within 7 days and overdue meetings. Calendar exports include reminders 1 day and 15 minutes before each meeting.';
+
+  @override
+  String get hiredPeopleTitle => 'Hired people';
+
+  @override
+  String get hiredPeopleSubtitle =>
+      'Keep recruiting history and ongoing reviews together.';
+
+  @override
+  String get hiredPeopleEmpty =>
+      'No hired people yet. People appear here after reaching a hired stage.';
+
+  @override
+  String get hiredPeopleSearch => 'Search hired people';
+
+  @override
+  String get employeeReviewsTitle => 'Review history';
+
+  @override
+  String get employeeReviewsEmpty =>
+      'No ongoing reviews yet. Add the first review to start the history.';
+
+  @override
+  String get employeeReviewsHidden =>
+      'Reviews are hidden. Use Show evaluations in the header to view them.';
+
+  @override
+  String get employeeAddReview => 'Add review';
+
+  @override
+  String get employeeEditReview => 'Edit review';
+
+  @override
+  String get employeeReviewTitle => 'Review title';
+
+  @override
+  String get employeeReviewer => 'Reviewer';
+
+  @override
+  String get employeeReviewDate => 'Review date';
+
+  @override
+  String get employeeReviewNotes => 'Discussion and feedback';
+
+  @override
+  String get employeeReviewGoals => 'Goals and follow-up actions';
+
+  @override
+  String get employeeReviewRequired =>
+      'Complete the title, reviewer, and discussion before saving.';
+
+  @override
+  String get employeeReviewSaved => 'Review saved.';
+
+  @override
+  String get employeeRecruitingHistory => 'Recruiting history';
+
+  @override
   String get appTitle => 'People';
 
   @override
@@ -33,11 +179,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get candidateMoveForwardBlocked =>
-      'Record a positive or neutral decision for the current stage before continuing.';
+      'Record positive interviewer feedback before advancing.';
 
   @override
   String get candidateRejectBlocked =>
-      'Record a negative or neutral decision for the current stage before rejecting this candidate.';
+      'Record negative interviewer feedback before rejecting.';
 
   @override
   String get candidateHireBlocked =>
@@ -313,6 +459,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'CV text extracted. Review the suggested details before saving.';
 
   @override
+  String get candidateOcrTextPreview => 'Review extracted text';
+
+  @override
+  String get candidateOcrNoContacts =>
+      'Text was extracted, but no name or email was identified. Review the extracted text and enter the contact details manually.';
+
+  @override
   String get candidateOcrNoText =>
       'No text could be extracted. Check the Windows OCR language settings.';
 
@@ -325,22 +478,19 @@ class AppLocalizationsEn extends AppLocalizations {
       'Choose a PDF, PNG, or JPEG file up to 15 MB.';
 
   @override
-  String get candidateFeedback => 'Interview feedback';
+  String get candidateFeedback => 'Interview & feedback';
 
   @override
   String get candidateFeedbackRequired => 'Feedback required';
 
   @override
-  String get candidateFeedbackMissing => 'No decision recorded for this stage';
+  String get candidateFeedbackMissing => 'Awaiting decision';
 
   @override
   String get candidateFeedbackPositive => 'Positive';
 
   @override
   String get candidateFeedbackNegative => 'Negative';
-
-  @override
-  String get candidateFeedbackNeutral => 'Neutral';
 
   @override
   String get candidateOverallDecision => 'Overall';
@@ -376,20 +526,19 @@ class AppLocalizationsEn extends AppLocalizations {
   String get candidateFeedbackSave => 'Save feedback';
 
   @override
+  String get candidateFeedbackDate => 'Interview date';
+
+  @override
   String get candidateFeedbackNotes => 'Interview notes';
 
   @override
-  String get candidateFeedbackHistory => 'Interview history';
+  String get candidateFeedbackHistory => 'Hiring activity';
 
   @override
   String get candidateFeedbackNone => 'No interview notes yet.';
 
   @override
   String get candidateFeedbackSaved => 'Feedback saved';
-
-  @override
-  String get candidateMoveBlocked =>
-      'A positive decision for the current stage is required before moving forward.';
 
   @override
   String get candidateOffer => 'Offer / pre-contract';
@@ -438,15 +587,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get candidateSourceAdd => 'Add source';
-
-  @override
-  String get candidateStageAdd => 'Add stage';
-
-  @override
-  String get candidateStageMoveUp => 'Move stage up';
-
-  @override
-  String get candidateStageMoveDown => 'Move stage down';
 
   @override
   String get candidateAddFromScouting => 'Add to hiring board';
@@ -523,7 +663,7 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get candidateStatPending => 'Feedback pending';
+  String get candidateStatPending => 'Candidate feedback pending';
 
   @override
   String get candidateStatTotal => 'Total';
@@ -551,9 +691,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get recruitingRemoveFavorite => 'Remove from favorites';
 
   @override
-  String get recruitingAddFavoriteCandidate => 'Add to candidates';
-
-  @override
   String get recruitingFavoriteSaved => 'Profile saved to favorites.';
 
   @override
@@ -563,22 +700,19 @@ class AppLocalizationsEn extends AppLocalizations {
   String get candidateSettingSave => 'Save settings';
 
   @override
-  String get candidateDefaultNew => 'New';
+  String get candidateDefaultNew => 'CV review';
 
   @override
-  String get candidateDefaultCvReview => 'CV review';
-
-  @override
-  String get candidateDefaultScreening => 'Screening interview';
+  String get candidateDefaultScreening => 'Introductory interview';
 
   @override
   String get candidateDefaultTechnical => 'Technical interview';
 
   @override
-  String get candidateDefaultFinal => 'Final interview';
+  String get candidateDefaultFinal => 'Germany interview';
 
   @override
-  String get candidateDefaultOffer => 'Offer / pre-contract';
+  String get candidateDefaultOffer => 'Offer';
 
   @override
   String get candidateDefaultHired => 'Hired';
@@ -607,4 +741,100 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get candidateActionFailed =>
       'Unable to save this recruiting change. Please review the data and try again.';
+
+  @override
+  String get recruitingHideEvaluations => 'Hide evaluations';
+
+  @override
+  String get recruitingShowEvaluations => 'Show evaluations';
+
+  @override
+  String get candidatePersonalDetails => 'Personal details';
+
+  @override
+  String get candidateHiringProcess => 'Hiring process';
+
+  @override
+  String get candidateStageEvaluation => 'Stage evaluation';
+
+  @override
+  String get candidateStageEvaluationsTitle => 'Stage evaluations & screening';
+
+  @override
+  String get candidateInterviewStep => 'Interview';
+
+  @override
+  String get candidateEvaluationDate => 'Evaluation date';
+
+  @override
+  String get candidateEvaluationNotes => 'Evaluation notes';
+
+  @override
+  String get candidateCurrentStageAction => 'Current stage';
+
+  @override
+  String get candidateFeedbackSentToCandidate =>
+      'Feedback communicated to candidate';
+
+  @override
+  String candidateAdvanceStage(String stage) {
+    return 'Advance to $stage';
+  }
+
+  @override
+  String get pipelineInterviewer => 'Interviewer / feedback owner';
+
+  @override
+  String get pipelineSchedule => 'Schedule interview';
+
+  @override
+  String get pipelineScheduleRequired =>
+      'Schedule the interview and assign an interviewer before recording a decision.';
+
+  @override
+  String get pipelineCvRequired =>
+      'Save your CV review notes before scheduling the introductory interview. No decision is needed at this stage.';
+
+  @override
+  String get pipelineCommunicationRequired =>
+      'Communicate the feedback to the candidate and mark it as shared before continuing.';
+
+  @override
+  String get pipelineFeedbackPending => 'Candidate feedback pending';
+
+  @override
+  String get pipelineFeedbackShared => 'Candidate feedback shared';
+
+  @override
+  String get pipelineReviewCv => 'Review CV and add initial notes';
+
+  @override
+  String get pipelineAwaitingFeedback => 'Collect interviewer feedback';
+
+  @override
+  String get pipelineReady => 'Ready for the next step';
+
+  @override
+  String get pipelineEditFeedback => 'Edit interview & feedback';
+
+  @override
+  String get pipelineCurrentStep => 'CURRENT STEP';
+
+  @override
+  String get pipelineOutcome => 'OUTCOME';
+
+  @override
+  String get pipelineCompletedSteps => 'Previous steps';
+
+  @override
+  String get pipelineCvDescription =>
+      'Read the CV and capture your first impressions. Then arrange the introductory interview; no approval decision is needed here.';
+
+  @override
+  String get pipelineInterviewDescription =>
+      'Schedule the conversation, collect the interviewer’s decision, and communicate the outcome to the candidate before continuing.';
+
+  @override
+  String get pipelineOfferDescription =>
+      'Prepare and send the proposal, then record the candidate’s response. An accepted offer completes the selection process.';
 }

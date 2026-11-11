@@ -5,10 +5,9 @@ import 'package:pdfrx/pdfrx.dart';
 import '../../domain/repositories/resume_text_extractor.dart';
 
 class WindowsResumeTextExtractor implements ResumeTextExtractor {
-  WindowsResumeTextExtractor(this._ocrChannel);
+  const WindowsResumeTextExtractor(this._ocrChannel);
 
-  static const int maximumPages = 2;
-  static const int minimumEmbeddedTextLength = 400;
+  static const int minimumEmbeddedTextLength = 40;
   static const int maximumRenderedWidth = 2400;
   static const int maximumRenderedHeight = 3400;
   static const int minimumOcrImageSide = 1800;
@@ -30,12 +29,10 @@ class WindowsResumeTextExtractor implements ResumeTextExtractor {
       sourceName: fileName,
     );
     try {
-      final pages = document.pages.take(maximumPages);
       final output = <String>[];
-      for (final page in pages) {
+      for (final page in document.pages) {
         final embeddedText = (await page.loadText())?.fullText ?? '';
-        if (embeddedText.trim().length >= minimumEmbeddedTextLength &&
-            embeddedText.contains('@')) {
+        if (_hasUsableEmbeddedText(embeddedText)) {
           output.add(embeddedText.trim());
           continue;
         }
@@ -57,7 +54,11 @@ class WindowsResumeTextExtractor implements ResumeTextExtractor {
           fullHeight: height.toDouble(),
           backgroundColor: 0xffffffff,
         );
-        if (rendered == null) continue;
+        if (rendered == null) {
+          throw const FormatException(
+            'The resume PDF page could not be rendered.',
+          );
+        }
         try {
           final renderedImage = image.Image.fromBytes(
             width: rendered.width,
@@ -68,8 +69,7 @@ class WindowsResumeTextExtractor implements ResumeTextExtractor {
             order: image.ChannelOrder.bgra,
           );
           final recognized = await _recognize(image.encodePng(renderedImage));
-          final embedded = embeddedText.trim();
-          output.add(embedded.isEmpty ? recognized : '$embedded\n$recognized');
+          output.add(recognized);
         } finally {
           rendered.dispose();
         }
@@ -80,40 +80,68 @@ class WindowsResumeTextExtractor implements ResumeTextExtractor {
     }
   }
 
+  bool _hasUsableEmbeddedText(String text) {
+    final trimmed = text.trim();
+    if (trimmed.length < minimumEmbeddedTextLength) return false;
+    final letters = RegExp(r'\p{L}', unicode: true).allMatches(trimmed).length;
+    final replacementCharacters = '\uFFFD'.allMatches(trimmed).length;
+    return letters >= minimumEmbeddedTextLength ~/ 2 &&
+        replacementCharacters / trimmed.length < 0.01;
+  }
+
   Future<String> _recognize(Uint8List imageBytes) async {
     final decoded = image.decodeImage(imageBytes);
     if (decoded == null) {
       throw const FormatException('The resume image could not be decoded.');
     }
     final oriented = image.bakeOrientation(decoded);
-    final grayscale = image.grayscale(oriented);
-    final enhanced = image.adjustColor(grayscale, contrast: 1.2);
-    final longestSide = enhanced.width > enhanced.height
-        ? enhanced.width
-        : enhanced.height;
-    final scale = longestSide > maximumRenderedWidth
-        ? maximumRenderedWidth / longestSide
+    final longestSide = oriented.width > oriented.height
+        ? oriented.width
+        : oriented.height;
+    final maximumWidth = oriented.width > oriented.height
+        ? maximumRenderedHeight
+        : maximumRenderedWidth;
+    final maximumHeight = oriented.width > oriented.height
+        ? maximumRenderedWidth
+        : maximumRenderedHeight;
+    final fitScale = <double>[
+      maximumWidth / oriented.width,
+      maximumHeight / oriented.height,
+    ].reduce((a, b) => a < b ? a : b);
+    final scale = fitScale < 1
+        ? fitScale
         : longestSide < minimumOcrImageSide
         ? (minimumOcrImageSide / longestSide).clamp(1, 1.8)
         : 1.0;
     final prepared = scale == 1
-        ? enhanced
+        ? oriented
         : image.copyResize(
-            enhanced,
-            width: (enhanced.width * scale).round(),
-            height: (enhanced.height * scale).round(),
+            oriented,
+            width: (oriented.width * scale).round(),
+            height: (oriented.height * scale).round(),
             interpolation: image.Interpolation.cubic,
           );
+    final text = await _recognizePrepared(prepared);
+    if (text.trim().isNotEmpty) return text;
+    // Keep source colors on the first pass; enhancement can erase light text.
+    final enhanced = image.adjustColor(
+      image.grayscale(prepared),
+      contrast: 1.2,
+    );
+    return _recognizePrepared(enhanced);
+  }
+
+  Future<String> _recognizePrepared(image.Image prepared) async {
     final text = await _ocrChannel.invokeMethod<String>(
       'recognizeText',
       image.encodePng(prepared),
     );
-    if (text != null && text.trim().isNotEmpty) return text;
-    // Contrast boosting can wash out light text; retry on the original image.
-    final fallback = await _ocrChannel.invokeMethod<String>(
-      'recognizeText',
-      image.encodePng(oriented),
-    );
-    return fallback ?? '';
+    if (text == null) {
+      throw PlatformException(
+        code: 'ocr_invalid_response',
+        message: 'Windows OCR did not return a recognition result.',
+      );
+    }
+    return text;
   }
 }

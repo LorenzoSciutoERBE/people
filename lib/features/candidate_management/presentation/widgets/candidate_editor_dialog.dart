@@ -1,11 +1,8 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter/services.dart';
-import 'package:uuid/uuid.dart';
 
 import '../../../../l10n/app_localizations.dart';
-import '../../di/candidate_management_dependencies.dart';
 import '../../domain/entities/recruiting_data.dart';
 import '../../domain/failures/candidate_repository_exception.dart';
 import '../../domain/usecases/parse_resume_contact.dart';
@@ -24,59 +21,31 @@ class CandidateEditorDialog extends ConsumerStatefulWidget {
 }
 
 class _CandidateEditorDialogState extends ConsumerState<CandidateEditorDialog> {
-  late final TextEditingController _firstName;
-  late final TextEditingController _lastName;
-  late final TextEditingController _email;
-  late final TextEditingController _phone;
-  late final TextEditingController _location;
-  late final TextEditingController _headline;
-  late final TextEditingController _skills;
-  late final TextEditingController _experience;
-  late final TextEditingController _github;
-  late final TextEditingController _linkedin;
-  late String _sourceId;
+  late final CandidateProfileControllers _form;
   List<int>? _cvBytes;
   String? _cvFileName;
   bool _ocrFound = false;
   bool _ocrRunning = false;
   String? _ocrMessage;
+  String _extractedText = '';
   bool _saving = false;
-  bool _nameIsRequired = false;
 
   @override
   void initState() {
     super.initState();
     final candidate = widget.candidate;
-    _firstName = TextEditingController(text: candidate?.firstName ?? '');
-    _lastName = TextEditingController(text: candidate?.lastName ?? '');
-    _email = TextEditingController(text: candidate?.email ?? '');
-    _phone = TextEditingController(text: candidate?.phone ?? '');
-    _location = TextEditingController(text: candidate?.location ?? '');
-    _headline = TextEditingController(text: candidate?.headline ?? '');
-    _skills = TextEditingController(text: candidate?.skills.join(', ') ?? '');
-    _experience = TextEditingController(
-      text: candidate?.yearsOfExperience?.toString() ?? '',
+    _form = CandidateProfileControllers(
+      candidate: candidate,
+      defaultSourceId: widget.data.sources
+          .firstWhere((source) => source.isActive)
+          .id,
     );
-    _github = TextEditingController(text: candidate?.githubUrl ?? '');
-    _linkedin = TextEditingController(text: candidate?.linkedinUrl ?? '');
-    _sourceId =
-        candidate?.sourceId ??
-        widget.data.sources.firstWhere((source) => source.isActive).id;
     _cvFileName = candidate?.cvFileName;
   }
 
   @override
   void dispose() {
-    _firstName.dispose();
-    _lastName.dispose();
-    _email.dispose();
-    _phone.dispose();
-    _location.dispose();
-    _headline.dispose();
-    _skills.dispose();
-    _experience.dispose();
-    _github.dispose();
-    _linkedin.dispose();
+    _form.dispose();
     super.dispose();
   }
 
@@ -85,7 +54,7 @@ class _CandidateEditorDialogState extends ConsumerState<CandidateEditorDialog> {
     final localization = AppLocalizations.of(context);
     final candidate = widget.candidate;
     final activeSources = widget.data.sources
-        .where((source) => source.isActive || source.id == _sourceId)
+        .where((source) => source.isActive || source.id == _form.sourceId)
         .toList(growable: false);
     final sourceNames = <String, String>{
       for (final source in activeSources)
@@ -102,37 +71,59 @@ class _CandidateEditorDialogState extends ConsumerState<CandidateEditorDialog> {
         child: SingleChildScrollView(
           child: Wrap(
             spacing: 16,
-            runSpacing: 10,
+            runSpacing: 12,
             children: [
-              _field(_firstName, localization.candidateFirstName, width: 350),
-              _field(_lastName, localization.candidateLastName, width: 350),
-              _field(_email, localization.candidateEmail, width: 350),
-              _field(_phone, localization.candidatePhone, width: 350),
-              _field(_location, localization.candidateLocation, width: 350),
-              _field(_headline, localization.candidateHeadline, width: 350),
-              _field(_skills, localization.candidateSkills, width: 350),
               _field(
-                _experience,
+                _form.firstName,
+                localization.candidateFirstName,
+                width: 350,
+                errorText: _form.firstNameError,
+                onChanged: (_) {
+                  if (_form.firstNameError != null) {
+                    setState(() => _form.firstNameError = null);
+                  }
+                },
+              ),
+              _field(
+                _form.lastName,
+                localization.candidateLastName,
+                width: 350,
+              ),
+              _field(_form.email, localization.candidateEmail, width: 350),
+              _field(_form.phone, localization.candidatePhone, width: 350),
+              _field(
+                _form.location,
+                localization.candidateLocation,
+                width: 350,
+              ),
+              _field(
+                _form.headline,
+                localization.candidateHeadline,
+                width: 350,
+              ),
+              _field(_form.skills, localization.candidateSkills, width: 350),
+              _field(
+                _form.experience,
                 localization.candidateExperience,
                 width: 350,
                 keyboardType: TextInputType.number,
+                errorText: _form.experienceError,
+                onChanged: (_) {
+                  if (_form.experienceError != null) {
+                    setState(() => _form.experienceError = null);
+                  }
+                },
               ),
-              _field(_github, localization.candidateGithubUrl, width: 350),
-              _field(_linkedin, localization.candidateLinkedinUrl, width: 350),
-              if (_nameIsRequired)
-                SizedBox(
-                  width: 720,
-                  child: Text(
-                    localization.candidateNameRequired,
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.error,
-                    ),
-                  ),
-                ),
+              _field(_form.github, localization.candidateGithubUrl, width: 350),
+              _field(
+                _form.linkedin,
+                localization.candidateLinkedinUrl,
+                width: 350,
+              ),
               SizedBox(
                 width: 350,
                 child: DropdownButtonFormField<String>(
-                  initialValue: _sourceId,
+                  initialValue: _form.sourceId,
                   decoration: InputDecoration(
                     labelText: localization.candidateSource,
                   ),
@@ -145,7 +136,7 @@ class _CandidateEditorDialogState extends ConsumerState<CandidateEditorDialog> {
                       )
                       .toList(growable: false),
                   onChanged: (value) {
-                    if (value != null) setState(() => _sourceId = value);
+                    if (value != null) setState(() => _form.sourceId = value);
                   },
                 ),
               ),
@@ -207,6 +198,23 @@ class _CandidateEditorDialogState extends ConsumerState<CandidateEditorDialog> {
                     ),
                   ),
                 ),
+              if (_extractedText.isNotEmpty)
+                SizedBox(
+                  width: 720,
+                  child: ExpansionTile(
+                    key: const Key('resume-extracted-text'),
+                    title: Text(localization.candidateOcrTextPreview),
+                    children: [
+                      SizedBox(
+                        height: 220,
+                        child: SingleChildScrollView(
+                          padding: const EdgeInsets.all(12),
+                          child: SelectableText(_extractedText),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
             ],
           ),
         ),
@@ -235,12 +243,15 @@ class _CandidateEditorDialogState extends ConsumerState<CandidateEditorDialog> {
     String label, {
     required double width,
     TextInputType? keyboardType,
+    String? errorText,
+    ValueChanged<String>? onChanged,
   }) => SizedBox(
     width: width,
     child: TextField(
       controller: controller,
       keyboardType: keyboardType,
-      decoration: InputDecoration(labelText: label),
+      onChanged: onChanged,
+      decoration: InputDecoration(labelText: label, errorText: errorText),
     ),
   );
 
@@ -264,6 +275,7 @@ class _CandidateEditorDialogState extends ConsumerState<CandidateEditorDialog> {
       _cvFileName = file.name;
       _ocrRunning = true;
       _ocrMessage = localization.candidateOcrRunning;
+      _extractedText = '';
     });
     try {
       final text = await ref
@@ -273,66 +285,45 @@ class _CandidateEditorDialogState extends ConsumerState<CandidateEditorDialog> {
       final found = _applyContact(text);
       setState(() {
         _ocrFound = found;
+        _extractedText = text.trim();
         _ocrMessage = text.trim().isEmpty
             ? localization.candidateOcrNoText
-            : localization.candidateOcrApplied;
+            : found
+            ? localization.candidateOcrApplied
+            : localization.candidateOcrNoContacts;
       });
-    } on PlatformException {
-      if (mounted) setState(() => _ocrMessage = localization.candidateOcrError);
-    } on Object {
-      if (mounted) setState(() => _ocrMessage = localization.candidateOcrError);
+    } on Exception {
+      if (mounted) {
+        setState(() {
+          _ocrFound = false;
+          _ocrMessage = localization.candidateOcrError;
+        });
+      }
     } finally {
       if (mounted) setState(() => _ocrRunning = false);
     }
   }
 
-  /// Fills only the name and email from the CV; the rest is discarded.
+  /// Fills empty contact fields only; extracted text is not persisted.
   bool _applyContact(String text) {
     final contact = const ParseResumeContact()(text);
-    if (_firstName.text.isEmpty) _firstName.text = contact.firstName;
-    if (_lastName.text.isEmpty) _lastName.text = contact.lastName;
-    if (_email.text.isEmpty) _email.text = contact.email;
+    if (_form.firstName.text.isEmpty) _form.firstName.text = contact.firstName;
+    if (_form.lastName.text.isEmpty) _form.lastName.text = contact.lastName;
+    if (_form.email.text.isEmpty) _form.email.text = contact.email;
     return contact.firstName.isNotEmpty ||
         contact.lastName.isNotEmpty ||
         contact.email.isNotEmpty;
   }
 
   Future<void> _save() async {
-    if (_firstName.text.trim().isEmpty) {
-      setState(() => _nameIsRequired = true);
-      return;
-    }
-    setState(() => _nameIsRequired = false);
+    final localization = AppLocalizations.of(context);
+    var isValid = false;
+    setState(() => isValid = _form.validate(localization));
+    if (!isValid) return;
     setState(() => _saving = true);
-    final now = DateTime.now().toUtc();
-    final old = widget.candidate;
-    final candidate = Candidate(
-      id: old?.id ?? const Uuid().v4(),
-      firstName: _firstName.text.trim(),
-      lastName: _lastName.text.trim(),
-      email: _email.text.trim(),
-      phone: _phone.text.trim(),
-      location: _location.text.trim(),
-      headline: _headline.text.trim(),
-      skills: _skills.text
-          .split(',')
-          .map((skill) => skill.trim())
-          .where((skill) => skill.isNotEmpty)
-          .toSet()
-          .toList(growable: false),
-      yearsOfExperience: int.tryParse(_experience.text.trim()),
-      githubUrl: _github.text.trim(),
-      linkedinUrl: _linkedin.text.trim(),
-      stageId: old?.stageId ?? '',
-      sourceId: _sourceId,
-      createdAt: old?.createdAt ?? now,
-      updatedAt: now,
-      cvFileName: _cvFileName ?? old?.cvFileName,
-      cvStorageKey: old?.cvStorageKey,
-      cvExtractedText: '',
-      interviews: old?.interviews ?? const <InterviewRecord>[],
-      ratings: old?.ratings ?? const <RatingAspect, double>{},
-      offer: old?.offer,
+    final candidate = _form.toCandidate(
+      existing: widget.candidate,
+      cvFileName: _cvFileName,
     );
     try {
       await ref

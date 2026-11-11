@@ -23,6 +23,7 @@ class _OfferDialogState extends ConsumerState<OfferDialog> {
   late final TextEditingController _notes;
   late OfferStatus _status;
   DateTime? _startDate;
+  bool _saving = false;
 
   @override
   void initState() {
@@ -64,18 +65,30 @@ class _OfferDialogState extends ConsumerState<OfferDialog> {
                   labelText: localization.candidateOfferPosition,
                 ),
               ),
-              TextField(
-                controller: _salary,
-                decoration: InputDecoration(
-                  labelText: localization.candidateOfferSalary,
-                ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    flex: 2,
+                    child: TextField(
+                      controller: _salary,
+                      decoration: InputDecoration(
+                        labelText: localization.candidateOfferSalary,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: TextField(
+                      controller: _currency,
+                      decoration: InputDecoration(
+                        labelText: localization.candidateOfferCurrency,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-              TextField(
-                controller: _currency,
-                decoration: InputDecoration(
-                  labelText: localization.candidateOfferCurrency,
-                ),
-              ),
+              const SizedBox(height: 12),
               TextField(
                 controller: _contractType,
                 decoration: InputDecoration(
@@ -84,6 +97,7 @@ class _OfferDialogState extends ConsumerState<OfferDialog> {
               ),
               const SizedBox(height: 12),
               DropdownButtonFormField<OfferStatus>(
+                key: const Key('candidate-offer-status'),
                 initialValue: _status,
                 decoration: InputDecoration(
                   labelText: localization.candidateOfferStatus,
@@ -101,19 +115,29 @@ class _OfferDialogState extends ConsumerState<OfferDialog> {
                 },
               ),
               const SizedBox(height: 12),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: OutlinedButton.icon(
-                  onPressed: _pickStartDate,
-                  icon: const Icon(Icons.calendar_month_outlined),
-                  label: Text(
-                    _startDate == null
-                        ? localization.candidateOfferStartDate
-                        : MaterialLocalizations.of(context)
-                              .formatMediumDate(_startDate!),
+              Row(
+                children: [
+                  OutlinedButton.icon(
+                    onPressed: _pickStartDate,
+                    icon: const Icon(Icons.calendar_month_outlined),
+                    label: Text(
+                      _startDate == null
+                          ? localization.candidateOfferStartDate
+                          : MaterialLocalizations.of(context)
+                                .formatMediumDate(_startDate!),
+                    ),
                   ),
-                ),
+                  if (_startDate != null) ...[
+                    const SizedBox(width: 8),
+                    IconButton(
+                      tooltip: localization.candidatesClearFilters,
+                      onPressed: () => setState(() => _startDate = null),
+                      icon: const Icon(Icons.clear, size: 18),
+                    ),
+                  ],
+                ],
               ),
+              const SizedBox(height: 12),
               TextField(
                 controller: _notes,
                 minLines: 3,
@@ -128,11 +152,12 @@ class _OfferDialogState extends ConsumerState<OfferDialog> {
       ),
       actions: [
         TextButton(
-          onPressed: () => Navigator.pop(context),
+          onPressed: _saving ? null : () => Navigator.pop(context),
           child: Text(localization.candidateCancel),
         ),
         FilledButton(
-          onPressed: _save,
+          key: const Key('candidate-offer-save'),
+          onPressed: _saving ? null : _save,
           child: Text(localization.candidateOfferSave),
         ),
       ],
@@ -151,6 +176,7 @@ class _OfferDialogState extends ConsumerState<OfferDialog> {
   }
 
   Future<void> _save() async {
+    setState(() => _saving = true);
     try {
       await ref
           .read(candidateManagementControllerProvider.notifier)
@@ -169,6 +195,8 @@ class _OfferDialogState extends ConsumerState<OfferDialog> {
       if (mounted) Navigator.pop(context);
     } on Object {
       if (mounted) showCandidateActionError(context);
+    } finally {
+      if (mounted) setState(() => _saving = false);
     }
   }
 }

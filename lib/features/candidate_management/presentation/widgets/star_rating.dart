@@ -37,7 +37,7 @@ class StarRating extends StatelessWidget {
                   ? MouseCursor.defer
                   : SystemMouseCursors.click,
               child: Icon(
-                _iconFor(current, index),
+                iconFor(current, index),
                 size: size,
                 color: current >= index + 0.5
                     ? color
@@ -54,7 +54,7 @@ class StarRating extends StatelessWidget {
     onChanged?.call(selected == value ? null : selected);
   }
 
-  static IconData _iconFor(double current, int index) {
+  static IconData iconFor(double current, int index) {
     if (current >= index + 1) return Icons.star_rounded;
     if (current >= index + 0.5) return Icons.star_half_rounded;
     return Icons.star_border_rounded;
@@ -75,7 +75,7 @@ class AverageRatingBadge extends StatelessWidget {
       children: [
         for (var index = 0; index < StarRating.starCount; index++)
           Icon(
-            _iconFor(displayRating, index),
+            StarRating.iconFor(displayRating, index),
             size: 16,
             color: displayRating >= index + 0.5
                 ? Colors.amber.shade800
@@ -92,11 +92,5 @@ class AverageRatingBadge extends StatelessWidget {
         ),
       ],
     );
-  }
-
-  static IconData _iconFor(double rating, int index) {
-    if (rating >= index + 1) return Icons.star_rounded;
-    if (rating >= index + 0.5) return Icons.star_half_rounded;
-    return Icons.star_border_rounded;
   }
 }

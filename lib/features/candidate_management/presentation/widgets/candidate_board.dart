@@ -8,8 +8,10 @@ import '../providers/candidate_management_providers.dart';
 import 'candidate_actions_menu.dart';
 import 'candidate_details_page.dart';
 import 'candidate_dialog_support.dart';
+import 'employment_plan_dialog.dart';
 import 'candidate_editor_dialog.dart';
 import 'candidate_status_widgets.dart';
+import 'pipeline_status.dart';
 import 'star_rating.dart';
 
 /// Kanban view of the hiring pipeline; cards can be dragged between stages.
@@ -22,8 +24,7 @@ class CandidateBoard extends ConsumerWidget {
     final recruitingState = ref.watch(candidateManagementControllerProvider);
     return recruitingState.when(
       data: (data) {
-        final stages = [...data.stages]
-          ..sort((first, second) => first.order.compareTo(second.order));
+        final stages = data.orderedStages;
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -121,6 +122,7 @@ class _HorizontalStagesState extends State<_HorizontalStages> {
       controller: _controller,
       thumbVisibility: true,
       child: ListView.separated(
+        key: const Key('candidate-board-stages'),
         controller: _controller,
         padding: const EdgeInsets.fromLTRB(32, 8, 32, 24),
         scrollDirection: Axis.horizontal,
@@ -132,7 +134,7 @@ class _HorizontalStagesState extends State<_HorizontalStages> {
   );
 }
 
-class _BoardHeader extends StatelessWidget {
+class _BoardHeader extends ConsumerWidget {
   const _BoardHeader({required this.data, required this.stages});
 
   final RecruitingData data;
@@ -140,47 +142,75 @@ class _BoardHeader extends StatelessWidget {
 
   int get _pendingFeedback {
     return data.candidates.where((candidate) {
-      if (!data.requiresFeedback(candidate.stageId)) return false;
-      final decision = candidate.latestFeedbackFor(candidate.stageId)?.decision;
-      return decision == null || decision == FeedbackDecision.pending;
+      return candidate.interviews.any(
+        (record) =>
+            record.stageId != 'new' &&
+            record.decision != FeedbackDecision.pending &&
+            !record.feedbackSharedWithCandidate,
+      );
     }).length;
   }
 
+  int get _hiredCount {
+    final hiredIds = stages
+        .where((stage) => stage.terminalOutcome == TerminalOutcome.hired)
+        .map((stage) => stage.id)
+        .toSet();
+    return data.candidates
+        .where((candidate) => hiredIds.contains(candidate.stageId))
+        .length;
+  }
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final localization = AppLocalizations.of(context);
     final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.fromLTRB(32, 24, 32, 16),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: Text(
-              localization.candidateBoardTitle,
-              style: theme.textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.w700,
+          Text(
+            localization.candidateBoardTitle,
+            style: theme.textTheme.headlineSmall?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              _Stat(
+                icon: Icons.people_outline,
+                label: localization.candidateStatTotal,
+                value: '${data.candidates.length}',
+                color: theme.colorScheme.primary,
               ),
-            ),
-          ),
-          _Stat(
-            label: localization.candidateStatTotal,
-            value: '${data.candidates.length}',
-            color: theme.colorScheme.primary,
-          ),
-          const SizedBox(width: 12),
-          _Stat(
-            label: localization.candidateStatPending,
-            value: '$_pendingFeedback',
-            color: const Color(0xFFE37400),
-          ),
-          const SizedBox(width: 20),
-          FilledButton.icon(
-            onPressed: () => showDialog<void>(
-              context: context,
-              builder: (_) => CandidateEditorDialog(data: data),
-            ),
-            icon: const Icon(Icons.person_add_alt_1),
-            label: Text(localization.candidateAdd),
+              if (_pendingFeedback > 0)
+                _Stat(
+                  icon: Icons.schedule_outlined,
+                  label: localization.candidateStatPending,
+                  value: '$_pendingFeedback',
+                  color: const Color(0xFFE37400),
+                ),
+              if (_hiredCount > 0)
+                _Stat(
+                  icon: Icons.verified_outlined,
+                  label: localization.candidateDefaultHired,
+                  value: '$_hiredCount',
+                  color: const Color(0xFF1E8E3E),
+                ),
+              FilledButton.icon(
+                onPressed: () => showDialog<void>(
+                  context: context,
+                  builder: (_) => CandidateEditorDialog(data: data),
+                ),
+                icon: const Icon(Icons.person_add_alt_1),
+                label: Text(localization.candidateAdd),
+              ),
+            ],
           ),
         ],
       ),
@@ -189,8 +219,14 @@ class _BoardHeader extends StatelessWidget {
 }
 
 class _Stat extends StatelessWidget {
-  const _Stat({required this.label, required this.value, required this.color});
+  const _Stat({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.color,
+  });
 
+  final IconData icon;
   final String label;
   final String value;
   final Color color;
@@ -202,10 +238,12 @@ class _Stat extends StatelessWidget {
       borderRadius: BorderRadius.circular(12),
     ),
     child: Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
+          Icon(icon, size: 18, color: color),
+          const SizedBox(width: 8),
           Text(
             value,
             style: Theme.of(context).textTheme.titleLarge
@@ -234,27 +272,13 @@ class _StageColumn extends ConsumerWidget {
   final List<HiringStage> stages;
   final bool feedbackRequired;
 
-  Color _accent(BuildContext context) => switch (stage.terminalOutcome) {
-    TerminalOutcome.hired => const Color(0xFF1E8E3E),
-    TerminalOutcome.rejected => const Color(0xFFD93025),
-    TerminalOutcome.active =>
-      stage.isOfferStage
-          ? const Color(0xFF8E4EC6)
-          : Theme.of(context).colorScheme.primary,
-  };
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final localization = AppLocalizations.of(context);
-    final accent = _accent(context);
+    final accent = stageAccentColor(context, stage);
     return DragTarget<String>(
-      onAcceptWithDetails: (details) => performCandidateAction(
-        context,
-        localization,
-        () => ref
-            .read(candidateManagementControllerProvider.notifier)
-            .moveCandidate(details.data, stage.id),
-      ),
+      onAcceptWithDetails: (details) =>
+          moveCandidateWithHiringPlan(context, ref, details.data, stage.id),
       builder: (context, candidateData, rejectedData) => AnimatedContainer(
         duration: const Duration(milliseconds: 150),
         width: 300,
@@ -292,28 +316,52 @@ class _StageColumn extends ConsumerWidget {
                           ?.copyWith(fontWeight: FontWeight.w700),
                     ),
                   ),
-                  Text(
-                    '${candidates.length}',
-                    style: Theme.of(context).textTheme.labelLarge
-                        ?.copyWith(color: accent),
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: accent.withValues(alpha: 0.14),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 2,
+                      ),
+                      child: Text(
+                        '${candidates.length}',
+                        style: Theme.of(context).textTheme.labelMedium
+                            ?.copyWith(
+                              color: accent,
+                              fontWeight: FontWeight.w700,
+                            ),
+                      ),
+                    ),
                   ),
                 ],
               ),
             ),
             Expanded(
-              child: ListView.separated(
-                padding: const EdgeInsets.fromLTRB(10, 2, 10, 10),
-                itemCount: candidates.length,
-                separatorBuilder: (context, index) =>
-                    const SizedBox(height: 10),
-                itemBuilder: (context, index) => _CandidateCard(
-                  candidate: candidates[index],
-                  stage: stage,
-                  sources: sources,
-                  stages: stages,
-                  feedbackRequired: feedbackRequired,
-                ),
-              ),
+              child: candidates.isEmpty
+                  ? Center(
+                      child: Icon(
+                        Icons.inbox_outlined,
+                        size: 28,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant
+                            .withValues(alpha: 0.35),
+                      ),
+                    )
+                  : ListView.separated(
+                      padding: const EdgeInsets.fromLTRB(10, 2, 10, 10),
+                      itemCount: candidates.length,
+                      separatorBuilder: (context, index) =>
+                          const SizedBox(height: 10),
+                      itemBuilder: (context, index) => _CandidateCard(
+                        candidate: candidates[index],
+                        stage: stage,
+                        sources: sources,
+                        stages: stages,
+                        feedbackRequired: feedbackRequired,
+                      ),
+                    ),
             ),
           ],
         ),
@@ -322,7 +370,7 @@ class _StageColumn extends ConsumerWidget {
   }
 }
 
-class _CandidateCard extends StatelessWidget {
+class _CandidateCard extends ConsumerWidget {
   const _CandidateCard({
     required this.candidate,
     required this.stage,
@@ -338,9 +386,10 @@ class _CandidateCard extends StatelessWidget {
   final bool feedbackRequired;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final localization = AppLocalizations.of(context);
     final theme = Theme.of(context);
+    final evaluationsVisible = ref.watch(evaluationsVisibleProvider);
     final source = sources
         .where((value) => value.id == candidate.sourceId)
         .firstOrNull;
@@ -374,6 +423,10 @@ class _CandidateCard extends StatelessWidget {
                   ),
                 ],
               ),
+              Padding(
+                padding: const EdgeInsets.only(top: 10, right: 8),
+                child: PipelineStatus(candidate: candidate),
+              ),
               if (candidate.headline.isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.only(top: 6, right: 8),
@@ -384,6 +437,51 @@ class _CandidateCard extends StatelessWidget {
                     style: theme.textTheme.bodySmall,
                   ),
                 ),
+              if (candidate.location.isNotEmpty ||
+                  candidate.yearsOfExperience != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 6, right: 8),
+                  child: Row(
+                    children: [
+                      if (candidate.location.isNotEmpty) ...[
+                        Icon(
+                          Icons.location_on_outlined,
+                          size: 13,
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                        const SizedBox(width: 3),
+                        Flexible(
+                          child: Text(
+                            candidate.location,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ),
+                      ],
+                      if (candidate.location.isNotEmpty &&
+                          candidate.yearsOfExperience != null)
+                        const SizedBox(width: 8),
+                      if (candidate.yearsOfExperience != null) ...[
+                        Icon(
+                          Icons.work_history_outlined,
+                          size: 13,
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                        const SizedBox(width: 3),
+                        Text(
+                          '${candidate.yearsOfExperience}y',
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
               if (candidate.skills.isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.only(top: 8, right: 8),
@@ -392,46 +490,35 @@ class _CandidateCard extends StatelessWidget {
                     runSpacing: 4,
                     children: [
                       for (final skill in candidate.skills.take(3))
-                        Chip(
-                          label: Text(skill),
-                          visualDensity: VisualDensity.compact,
-                          side: BorderSide.none,
-                          backgroundColor: theme.colorScheme.primaryContainer
-                              .withValues(alpha: 0.5),
-                        ),
+                        CandidateSkillChip(skill: skill),
                     ],
                   ),
                 ),
               Padding(
                 padding: const EdgeInsets.only(top: 10, right: 8),
-                child: Row(
+                child: Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-                    if (feedbackRequired)
-                      Flexible(
-                        child: FeedbackBadge(
-                          decision: candidate
-                              .latestFeedbackFor(stage.id)
-                              ?.decision,
-                        ),
+                    if (evaluationsVisible && stage.isInterview)
+                      FeedbackBadge(
+                        decision: candidate
+                            .latestFeedbackFor(stage.id)
+                            ?.decision,
                       ),
-                    const Spacer(),
-                    if (candidate.averageRating case final rating?)
-                      Padding(
-                        padding: const EdgeInsets.only(right: 8),
-                        child: Tooltip(
+                    if (source != null) SourceBadge(source: source),
+                    if (evaluationsVisible)
+                      if (candidate.averageRating case final rating?)
+                        Tooltip(
                           message: localization.candidateAverageRating,
                           child: AverageRatingBadge(rating: rating),
                         ),
-                      ),
-                    if (source != null)
-                      Tooltip(
-                        message: localizedSourceName(localization, source),
-                        child: const Icon(Icons.source_outlined, size: 16),
-                      ),
                     if (candidate.hasResume)
-                      const Padding(
-                        padding: EdgeInsets.only(left: 6),
-                        child: Icon(Icons.description_outlined, size: 16),
+                      Icon(
+                        Icons.description_outlined,
+                        size: 16,
+                        color: theme.colorScheme.primary,
                       ),
                   ],
                 ),

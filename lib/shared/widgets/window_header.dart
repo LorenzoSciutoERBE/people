@@ -51,6 +51,16 @@ class _WindowHeaderState extends State<WindowHeader> with WindowListener {
     if (mounted) setState(() => _maximized = false);
   }
 
+  @override
+  void onWindowResize() {
+    _runWindowAction(() async {
+      final maximized = await windowManager.isMaximized();
+      if (mounted && _maximized != maximized) {
+        setState(() => _maximized = maximized);
+      }
+    });
+  }
+
   Future<void> _toggleMaximize() => _runWindowAction(() async {
     if (await windowManager.isMaximized()) {
       await windowManager.unmaximize();
@@ -81,57 +91,67 @@ class _WindowHeaderState extends State<WindowHeader> with WindowListener {
     final l10n = AppLocalizations.of(context);
     return Material(
       color: Colors.white,
-      child: SafeArea(
-        bottom: false,
-        child: SizedBox(
-          height: widget.preferredSize.height,
-          child: Row(
-            children: [
-              if (widget.showBack) const BackButton(),
-              Expanded(
-                child: GestureDetector(
-                  key: const ValueKey('window-drag-area'),
-                  behavior: HitTestBehavior.opaque,
-                  onPanStart: _windows
-                      ? (_) => _runWindowAction(windowManager.startDragging)
-                      : null,
-                  onDoubleTap: _windows ? _toggleMaximize : null,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: Image.asset(
-                        'assets/logo.jpg',
-                        width: 112,
-                        height: 32,
-                        fit: BoxFit.contain,
-                        semanticLabel: l10n.companyLogoLabel,
+      child: DecoratedBox(
+        decoration: const BoxDecoration(
+          border: Border(bottom: BorderSide(color: Color(0xFFE4EAF2))),
+        ),
+        child: SafeArea(
+          bottom: false,
+          child: SizedBox(
+            height: widget.preferredSize.height,
+            child: Row(
+              children: [
+                if (widget.showBack) const BackButton(),
+                Expanded(
+                  child: GestureDetector(
+                    key: const ValueKey('window-drag-area'),
+                    behavior: HitTestBehavior.opaque,
+                    onPanStart: _windows
+                        ? (_) => _runWindowAction(windowManager.startDragging)
+                        : null,
+                    onDoubleTap: _windows ? _toggleMaximize : null,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: Image.asset(
+                          'assets/logo.jpg',
+                          width: 112,
+                          height: 32,
+                          fit: BoxFit.contain,
+                          semanticLabel: l10n.companyLogoLabel,
+                          errorBuilder: (context, error, stackTrace) => Text(
+                            l10n.appTitle,
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(fontWeight: FontWeight.w700),
+                          ),
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
-              widget.action,
-              const SizedBox(width: 8),
-              if (_windows) ...[
-                _control(
-                  l10n.minimizeWindow,
-                  Icons.horizontal_rule,
-                  () => _runWindowAction(windowManager.minimize),
-                ),
-                _control(
-                  _maximized ? l10n.restoreWindow : l10n.maximizeWindow,
-                  _maximized ? Icons.filter_none : Icons.crop_square,
-                  _toggleMaximize,
-                ),
-                _control(
-                  l10n.closeWindow,
-                  Icons.close,
-                  () => _runWindowAction(windowManager.close),
-                  close: true,
-                ),
+                widget.action,
+                const SizedBox(width: 8),
+                if (_windows) ...[
+                  _control(
+                    l10n.minimizeWindow,
+                    Icons.horizontal_rule,
+                    () => _runWindowAction(windowManager.minimize),
+                  ),
+                  _control(
+                    _maximized ? l10n.restoreWindow : l10n.maximizeWindow,
+                    _maximized ? Icons.filter_none : Icons.crop_square,
+                    _toggleMaximize,
+                  ),
+                  _control(
+                    l10n.closeWindow,
+                    Icons.close,
+                    () => _runWindowAction(windowManager.close),
+                    close: true,
+                  ),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       ),

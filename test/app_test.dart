@@ -11,8 +11,9 @@ import 'package:people/features/auth/domain/entities/auth_session.dart';
 import 'package:people/features/auth/domain/failures/auth_failure.dart';
 import 'package:people/features/auth/presentation/providers/auth_providers.dart';
 import 'package:people/features/candidate_management/domain/entities/recruiting_data.dart';
+import 'package:people/features/candidate_management/domain/entities/employment_plan.dart';
 import 'package:people/features/candidate_management/domain/repositories/candidate_repository.dart';
-import 'package:people/features/candidate_management/di/candidate_management_dependencies.dart';
+import 'package:people/features/candidate_management/presentation/providers/candidate_management_providers.dart';
 import 'package:people/features/talent_scouting/data/datasources/github_talent_remote_data_source.dart';
 import 'package:people/features/talent_scouting/presentation/providers/scouting_providers.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -58,7 +59,7 @@ void main() {
       3,
     );
 
-    await tester.tap(find.text('GitHub search'));
+    await tester.tap(find.byKey(const Key('navigation-search')));
     await tester.pumpAndSettle();
     expect(find.text('Scouting filters'), findsOneWidget);
     expect(
@@ -75,6 +76,7 @@ void main() {
       1,
     );
     await tester.tap(find.byTooltip('Expand or collapse menu'));
+    await tester.pump(const Duration(milliseconds: 50));
     await tester.pumpAndSettle();
     final compactRail = tester.widget<NavigationRail>(
       find.byType(NavigationRail),
@@ -158,7 +160,7 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      await tester.tap(find.text('GitHub search'));
+      await tester.tap(find.byKey(const Key('navigation-search')));
       await tester.pumpAndSettle();
 
       final startButton = tester.widget<FilledButton>(
@@ -219,7 +221,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.text('GitHub search'));
+    await tester.tap(find.byKey(const Key('navigation-search')));
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField).first, 'Flutter');
     await tester.pump();
@@ -263,7 +265,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.text('GitHub search'));
+    await tester.tap(find.byKey(const Key('navigation-search')));
     await tester.pumpAndSettle();
 
     expect(find.text('GitHub API connected as: octocat'), findsOneWidget);
@@ -275,7 +277,7 @@ void main() {
   testWidgets('shows auth errors without overflowing a narrow sidebar', (
     tester,
   ) async {
-    tester.view.physicalSize = const Size(1000, 900);
+    tester.view.physicalSize = const Size(1000, 710);
     tester.view.devicePixelRatio = 1;
     SharedPreferences.setMockInitialValues(<String, Object>{
       'app_locale': 'en',
@@ -288,14 +290,14 @@ void main() {
           sharedPreferencesProvider.overrideWithValue(preferences),
           authNotifierProvider.overrideWith(_FailedAuthNotifier.new),
           candidateRepositoryProvider.overrideWith(
-            (ref) async => _TestCandidateRepository(),
+            (ref) async => _TestCandidateRepository(withCandidate: true),
           ),
         ],
         child: const PeopleApp(),
       ),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.text('GitHub search'));
+    await tester.tap(find.byKey(const Key('navigation-search')));
     await tester.pumpAndSettle();
 
     expect(
@@ -306,6 +308,77 @@ void main() {
     );
     expect(find.text('Connect GitHub API'), findsOneWidget);
     expect(tester.takeException(), isNull);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+  });
+
+  testWidgets('collapses and scrolls navigation rail in a short window', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1200, 480);
+    tester.view.devicePixelRatio = 1;
+    SharedPreferences.setMockInitialValues(<String, Object>{
+      'app_locale': 'en',
+    });
+    final preferences = await SharedPreferences.getInstance();
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          sharedPreferencesProvider.overrideWithValue(preferences),
+          authNotifierProvider.overrideWith(_TestAuthNotifier.new),
+          candidateRepositoryProvider.overrideWith(
+            (ref) async => _TestCandidateRepository(withCandidate: true),
+          ),
+        ],
+        child: const PeopleApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('Expand or collapse menu'));
+    await tester.pump(const Duration(milliseconds: 50));
+    await tester.pumpAndSettle();
+
+    expect(tester.getSize(find.byType(NavigationRail)).width, 104);
+    expect(tester.takeException(), isNull);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+  });
+
+  testWidgets('toggles evaluations visibility from the top header', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1400, 900);
+    tester.view.devicePixelRatio = 1;
+    SharedPreferences.setMockInitialValues(<String, Object>{
+      'app_locale': 'en',
+    });
+    final preferences = await SharedPreferences.getInstance();
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          sharedPreferencesProvider.overrideWithValue(preferences),
+          authNotifierProvider.overrideWith(_TestAuthNotifier.new),
+          candidateRepositoryProvider.overrideWith(
+            (ref) async => _TestCandidateRepository(withCandidate: true),
+          ),
+        ],
+        child: const PeopleApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Review CV and add initial notes'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('toggle-evaluations-visibility')));
+    await tester.pumpAndSettle();
+    expect(find.text('Review CV and add initial notes'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('toggle-evaluations-visibility')));
+    await tester.pumpAndSettle();
+    expect(find.text('Review CV and add initial notes'), findsOneWidget);
+
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
   });
@@ -332,8 +405,33 @@ class _FailedAuthNotifier extends AuthNotifier {
 }
 
 class _TestCandidateRepository implements CandidateRepository {
+  _TestCandidateRepository({this.withCandidate = false});
+
+  final bool withCandidate;
+
   @override
-  Future<RecruitingData> load() async => RecruitingData.initial();
+  Future<RecruitingData> load() async => withCandidate
+      ? RecruitingData.initial().copyWith(
+          candidates: [
+            Candidate(
+              id: 'c-1',
+              firstName: 'Ada',
+              lastName: 'Lovelace',
+              email: 'ada@example.com',
+              phone: '',
+              location: 'London',
+              headline: 'Engineer',
+              skills: const ['Dart'],
+              stageId: 'new',
+              sourceId: 'github',
+              githubUrl: '',
+              linkedinUrl: '',
+              createdAt: DateTime.utc(2026),
+              updatedAt: DateTime.utc(2026),
+            ),
+          ],
+        )
+      : RecruitingData.initial();
 
   @override
   Future<Candidate> saveCandidate(
@@ -356,16 +454,33 @@ class _TestCandidateRepository implements CandidateRepository {
     required String stageId,
     required FeedbackDecision decision,
     required String notes,
+    DateTime? recordedAt,
+    bool? feedbackSharedWithCandidate,
+    DateTime? scheduledAt,
+    String? interviewer,
   }) async {}
 
   @override
   Future<void> moveCandidate(
     String candidateId,
-    String destinationStageId,
-  ) async {}
+    String destinationStageId, {
+    EmploymentPlan? employmentPlan,
+  }) async {}
 
   @override
   Future<void> saveOffer(String candidateId, CandidateOffer offer) async {}
+
+  @override
+  Future<void> saveEmployeeReview(
+    String candidateId,
+    EmployeeReview review,
+  ) async {}
+
+  @override
+  Future<void> saveEmploymentPlan(
+    String candidateId,
+    EmploymentPlan plan,
+  ) async {}
 
   @override
   Future<void> saveConfiguration({
