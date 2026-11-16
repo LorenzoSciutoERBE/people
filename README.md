@@ -3,11 +3,10 @@
 [![Dart SDK](https://img.shields.io/badge/Dart-%5E3.13.5-0175C2?logo=dart&logoColor=white)](pubspec.yaml)
 [![C++](https://img.shields.io/badge/C%2B%2B-17-00599C?logo=cplusplus&logoColor=white)](windows/CMakeLists.txt)
 [![PowerShell](https://img.shields.io/badge/PowerShell-7-5391FE)](docs/development.md)
-[![Flutter](https://img.shields.io/badge/Flutter-3.47.8-02569B?logo=flutter&logoColor=white)](.github/workflows/tests.yml)
+[![Flutter](https://img.shields.io/badge/Flutter-3.47.8-02569B?logo=flutter&logoColor=white)](.github/workflows/release-windows.yml)
 [![Version](https://img.shields.io/badge/version-1.0.0-2ea44f)](pubspec.yaml)
 [![Platform](https://img.shields.io/badge/platform-Windows_x64-0078D4)](docs/releases.md)
-[![Tests](https://github.com/LorenzoSciutoERBE/people/actions/workflows/tests.yml/badge.svg?branch=master)](https://github.com/LorenzoSciutoERBE/people/actions/workflows/tests.yml)
-[![Windows release](https://github.com/LorenzoSciutoERBE/people/actions/workflows/release-windows.yml/badge.svg?branch=master)](https://github.com/LorenzoSciutoERBE/people/actions/workflows/release-windows.yml)
+[![Windows CI](https://github.com/LorenzoSciutoERBE/people/actions/workflows/release-windows.yml/badge.svg?branch=master)](https://github.com/LorenzoSciutoERBE/people/actions/workflows/release-windows.yml)
 
 A Windows desktop app for managing recruitment, from discovering talent to following up with new hires. Built with Flutter, with English and Italian interfaces.
 
@@ -32,7 +31,7 @@ Check [GitHub Releases](https://github.com/LorenzoSciutoERBE/people/releases) fo
 
 Requires Windows 10 version 1809 or later. Packages are currently unsigned. The portable package stores application data in your Windows user profile; that data does not travel with the ZIP. Scanned resume import requires Windows OCR language capabilities.
 
-CI creates draft releases for review; drafts are not public downloads until published. Workflow artifacts are also available from successful [Windows release runs](https://github.com/LorenzoSciutoERBE/people/actions/workflows/release-windows.yml), subject to GitHub access permissions and artifact retention.
+One Windows CI pipeline runs the tests, then builds and verifies both packages. Each run increments the patch version (for example, `1.0.0` to `1.0.1`). CI creates draft releases for review; drafts are not public downloads until published. Workflow artifacts are also available from successful [Windows CI runs](https://github.com/LorenzoSciutoERBE/people/actions/workflows/release-windows.yml), subject to GitHub access permissions and artifact retention.
 
 ## Privacy and GitHub access
 
