@@ -4,7 +4,7 @@
 [![C++](https://img.shields.io/badge/C%2B%2B-17-00599C?logo=cplusplus&logoColor=white)](windows/CMakeLists.txt)
 [![PowerShell](https://img.shields.io/badge/PowerShell-7-5391FE)](docs/development.md)
 [![Flutter](https://img.shields.io/badge/Flutter-3.47.8-02569B?logo=flutter&logoColor=white)](.github/workflows/release-windows.yml)
-[![Version](https://img.shields.io/badge/version-1.0.0-2ea44f)](pubspec.yaml)
+[![Version](https://img.shields.io/badge/version-1.0.1-2ea44f)](pubspec.yaml)
 [![Platform](https://img.shields.io/badge/platform-Windows_x64-0078D4)](docs/releases.md)
 [![Windows CI](https://github.com/LorenzoSciutoERBE/people/actions/workflows/release-windows.yml/badge.svg?branch=master)](https://github.com/LorenzoSciutoERBE/people/actions/workflows/release-windows.yml)
 
