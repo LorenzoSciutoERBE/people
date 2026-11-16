@@ -63,8 +63,8 @@
   "discardChanges": "Discard changes",
   "candidateActions": "Candidate actions",
   "candidateMoveToStage": "Move to stage",
-  "candidateMoveForwardBlocked": "Record positive interviewer feedback before advancing.",
-  "candidateRejectBlocked": "Record negative interviewer feedback before rejecting.",
+  "candidateMoveForwardBlocked": "Record positive feedback before advancing.",
+  "candidateRejectBlocked": "Record negative feedback before rejecting.",
   "candidateHireBlocked": "Hiring requires the offer stage, an accepted offer and a positive decision.",
   "candidateTransitionBlocked": "Move to the next active stage, or choose a final outcome.",
   "companyLogoLabel": "Company logo",
@@ -177,6 +177,11 @@
   "candidateOverallDecision": "Overall",
   "candidateRatings": "Ratings",
   "candidateAverageRating": "Average rating",
+  "candidateRatingNotRated": "Not rated",
+  "candidateRatingScore": "{score} / 5",
+  "@candidateRatingScore": { "placeholders": { "score": { "type": "String" } } },
+  "candidateRatedCriteria": "{rated} of {total} criteria rated",
+  "@candidateRatedCriteria": { "placeholders": { "rated": { "type": "int" }, "total": { "type": "int" } } },
   "ratingTechnicalSkills": "Technical skills",
   "ratingProblemSolving": "Problem solving",
   "ratingCommunication": "Communication",
@@ -291,21 +296,30 @@
       }
     }
   },
-  "pipelineInterviewer": "Interviewer / feedback owner",
-  "pipelineSchedule": "Schedule interview",
-  "pipelineScheduleRequired": "Schedule the interview and assign an interviewer before recording a decision.",
+  "pipelineInterviewer": "Feedback author (optional)",
+  "pipelineSchedule": "Add interview date (optional)",
+  "pipelineOptionalDetails": "Optional interview details",
+  "pipelineViewStep": "Open {stage}",
+  "@pipelineViewStep": {
+    "placeholders": {
+      "stage": { "type": "String" }
+    }
+  },
   "pipelineCvRequired": "Save your CV review notes before scheduling the introductory interview. No decision is needed at this stage.",
   "pipelineCommunicationRequired": "Communicate the feedback to the candidate and mark it as shared before continuing.",
   "pipelineFeedbackPending": "Candidate feedback pending",
   "pipelineFeedbackShared": "Candidate feedback shared",
   "pipelineReviewCv": "Review CV and add initial notes",
-  "pipelineAwaitingFeedback": "Collect interviewer feedback",
+  "pipelineAwaitingFeedback": "Add feedback",
   "pipelineReady": "Ready for the next step",
   "pipelineEditFeedback": "Edit interview & feedback",
   "pipelineCurrentStep": "CURRENT STEP",
   "pipelineOutcome": "OUTCOME",
+  "pipelineOutcomeOptions": "Hired or rejected",
+  "pipelineStartDate": "Start: {date}",
+  "@pipelineStartDate": { "placeholders": { "date": { "type": "String" } } },
   "pipelineCompletedSteps": "Previous steps",
   "pipelineCvDescription": "Read the CV and capture your first impressions. Then arrange the introductory interview; no approval decision is needed here.",
-  "pipelineInterviewDescription": "Schedule the conversation, collect the interviewer’s decision, and communicate the outcome to the candidate before continuing.",
+  "pipelineInterviewDescription": "Save your notes and outcome. You can add the interview date and feedback author if useful.",
   "pipelineOfferDescription": "Prepare and send the proposal, then record the candidate’s response. An accepted offer completes the selection process."
 }

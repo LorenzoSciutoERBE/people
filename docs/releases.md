@@ -1,12 +1,12 @@
 # Windows releases
 
-Update `version` in `pubspec.yaml`, commit the changes, and push a matching tag such as `v1.0.0`. The Release Windows workflow runs formatting, analysis, unit/widget tests, and Windows integration tests before building the x64 distributions. It creates a **draft** GitHub Release with:
+Push to `master` to run the Release Windows workflow. It runs formatting, analysis, unit/widget tests, and Windows integration tests before building the x64 distributions. It creates a **draft** GitHub Release with:
 
 - `People-<version>-windows-x64-setup.exe`: per-user installer with Start menu integration, an optional desktop shortcut, upgrades using a stable application ID, and uninstall support.
 - `People-<version>-windows-x64-portable.zip`: extract the entire archive and launch `People/people.exe`; keep its DLLs and data directory together.
 - `SHA256SUMS.txt`: SHA-256 hashes for both downloads.
 
-Manual workflow runs upload the same artifacts without creating a GitHub Release. Review the draft and publish it when ready. Existing releases are never overwritten. The packaging check validates hashes, extracts the ZIP, silently installs into an isolated directory, compares every installed file with the portable bundle, and uninstalls it.
+Manual workflow runs are also supported. Runs on `master` create a draft release; manual runs on other refs only upload workflow artifacts. Pull requests, pushes to other branches, and tag pushes do not trigger CI. Each draft uses a unique tag such as `v1.0.0-build.42.1`, combining the `pubspec.yaml` version, workflow run number, and run attempt, and targets the exact built commit. Review the draft and publish it when ready. Existing releases are never overwritten. The packaging check validates hashes, extracts the ZIP, silently installs into an isolated directory, compares every installed file with the portable bundle, and uninstalls it.
 
 Both packages contain the complete Flutter Release directory and the app-local Visual C++ runtime from the installed Visual Studio toolchain. They require Windows 10 version 1809 or later. Windows OCR features require the appropriate Windows OCR language capabilities on the destination machine.
 

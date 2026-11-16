@@ -395,13 +395,13 @@ abstract class AppLocalizations {
   /// No description provided for @candidateMoveForwardBlocked.
   ///
   /// In en, this message translates to:
-  /// **'Record positive interviewer feedback before advancing.'**
+  /// **'Record positive feedback before advancing.'**
   String get candidateMoveForwardBlocked;
 
   /// No description provided for @candidateRejectBlocked.
   ///
   /// In en, this message translates to:
-  /// **'Record negative interviewer feedback before rejecting.'**
+  /// **'Record negative feedback before rejecting.'**
   String get candidateRejectBlocked;
 
   /// No description provided for @candidateHireBlocked.
@@ -968,6 +968,24 @@ abstract class AppLocalizations {
   /// **'Average rating'**
   String get candidateAverageRating;
 
+  /// No description provided for @candidateRatingNotRated.
+  ///
+  /// In en, this message translates to:
+  /// **'Not rated'**
+  String get candidateRatingNotRated;
+
+  /// No description provided for @candidateRatingScore.
+  ///
+  /// In en, this message translates to:
+  /// **'{score} / 5'**
+  String candidateRatingScore(String score);
+
+  /// No description provided for @candidateRatedCriteria.
+  ///
+  /// In en, this message translates to:
+  /// **'{rated} of {total} criteria rated'**
+  String candidateRatedCriteria(int rated, int total);
+
   /// No description provided for @ratingTechnicalSkills.
   ///
   /// In en, this message translates to:
@@ -1511,20 +1529,26 @@ abstract class AppLocalizations {
   /// No description provided for @pipelineInterviewer.
   ///
   /// In en, this message translates to:
-  /// **'Interviewer / feedback owner'**
+  /// **'Feedback author (optional)'**
   String get pipelineInterviewer;
 
   /// No description provided for @pipelineSchedule.
   ///
   /// In en, this message translates to:
-  /// **'Schedule interview'**
+  /// **'Add interview date (optional)'**
   String get pipelineSchedule;
 
-  /// No description provided for @pipelineScheduleRequired.
+  /// No description provided for @pipelineOptionalDetails.
   ///
   /// In en, this message translates to:
-  /// **'Schedule the interview and assign an interviewer before recording a decision.'**
-  String get pipelineScheduleRequired;
+  /// **'Optional interview details'**
+  String get pipelineOptionalDetails;
+
+  /// No description provided for @pipelineViewStep.
+  ///
+  /// In en, this message translates to:
+  /// **'Open {stage}'**
+  String pipelineViewStep(String stage);
 
   /// No description provided for @pipelineCvRequired.
   ///
@@ -1559,7 +1583,7 @@ abstract class AppLocalizations {
   /// No description provided for @pipelineAwaitingFeedback.
   ///
   /// In en, this message translates to:
-  /// **'Collect interviewer feedback'**
+  /// **'Add feedback'**
   String get pipelineAwaitingFeedback;
 
   /// No description provided for @pipelineReady.
@@ -1586,6 +1610,18 @@ abstract class AppLocalizations {
   /// **'OUTCOME'**
   String get pipelineOutcome;
 
+  /// No description provided for @pipelineOutcomeOptions.
+  ///
+  /// In en, this message translates to:
+  /// **'Hired or rejected'**
+  String get pipelineOutcomeOptions;
+
+  /// No description provided for @pipelineStartDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Start: {date}'**
+  String pipelineStartDate(String date);
+
   /// No description provided for @pipelineCompletedSteps.
   ///
   /// In en, this message translates to:
@@ -1601,7 +1637,7 @@ abstract class AppLocalizations {
   /// No description provided for @pipelineInterviewDescription.
   ///
   /// In en, this message translates to:
-  /// **'Schedule the conversation, collect the interviewer’s decision, and communicate the outcome to the candidate before continuing.'**
+  /// **'Save your notes and outcome. You can add the interview date and feedback author if useful.'**
   String get pipelineInterviewDescription;
 
   /// No description provided for @pipelineOfferDescription.

@@ -122,6 +122,7 @@ class CandidateOffer {
     this.contractType = '',
     this.proposedStartDate,
     this.notes = '',
+    this.recordedAt,
   });
 
   final OfferStatus status;
@@ -131,6 +132,7 @@ class CandidateOffer {
   final String contractType;
   final DateTime? proposedStartDate;
   final String notes;
+  final DateTime? recordedAt;
 }
 
 class Candidate {

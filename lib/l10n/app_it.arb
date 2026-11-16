@@ -177,6 +177,11 @@
   "candidateOverallDecision": "Giudizio complessivo",
   "candidateRatings": "Valutazioni",
   "candidateAverageRating": "Voto medio",
+  "candidateRatingNotRated": "Da valutare",
+  "candidateRatingScore": "{score} / 5",
+  "@candidateRatingScore": { "placeholders": { "score": { "type": "String" } } },
+  "candidateRatedCriteria": "{rated} criteri valutati su {total}",
+  "@candidateRatedCriteria": { "placeholders": { "rated": { "type": "int" }, "total": { "type": "int" } } },
   "ratingTechnicalSkills": "Competenze tecniche",
   "ratingProblemSolving": "Problem solving",
   "ratingCommunication": "Comunicazione",
@@ -291,21 +296,30 @@
       }
     }
   },
-  "pipelineInterviewer": "Intervistatore / responsabile feedback",
-  "pipelineSchedule": "Pianifica colloquio",
-  "pipelineScheduleRequired": "Pianifica il colloquio e assegna un intervistatore prima di registrare una decisione.",
+  "pipelineInterviewer": "Autore del feedback (facoltativo)",
+  "pipelineSchedule": "Aggiungi data del colloquio (facoltativa)",
+  "pipelineOptionalDetails": "Dettagli facoltativi del colloquio",
+  "pipelineViewStep": "Apri {stage}",
+  "@pipelineViewStep": {
+    "placeholders": {
+      "stage": { "type": "String" }
+    }
+  },
   "pipelineCvRequired": "Salva le note sul CV prima di pianificare il colloquio conoscitivo. Non serve una decisione in questa fase.",
   "pipelineCommunicationRequired": "Comunica il feedback al candidato e segna la comunicazione prima di continuare.",
   "pipelineFeedbackPending": "Feedback al candidato da comunicare",
   "pipelineFeedbackShared": "Feedback comunicato al candidato",
   "pipelineReviewCv": "Rivedi il CV e aggiungi le prime note",
-  "pipelineAwaitingFeedback": "Raccogli il feedback dell’intervistatore",
+  "pipelineAwaitingFeedback": "Aggiungi feedback",
   "pipelineReady": "Pronto per il prossimo step",
   "pipelineEditFeedback": "Modifica colloquio e feedback",
   "pipelineCurrentStep": "FASE ATTUALE",
   "pipelineOutcome": "ESITO",
+  "pipelineOutcomeOptions": "Assunto o rifiutato",
+  "pipelineStartDate": "Inizio: {date}",
+  "@pipelineStartDate": { "placeholders": { "date": { "type": "String" } } },
   "pipelineCompletedSteps": "Fasi precedenti",
   "pipelineCvDescription": "Leggi il CV e annota le prime impressioni. Poi organizza il colloquio conoscitivo; qui non serve una decisione.",
-  "pipelineInterviewDescription": "Pianifica il colloquio, raccogli la decisione dell’intervistatore e comunica l’esito al candidato prima di proseguire.",
+  "pipelineInterviewDescription": "Salva note ed esito. Se ti servono, puoi aggiungere la data del colloquio e l’autore del feedback.",
   "pipelineOfferDescription": "Prepara e invia la proposta, poi registra la risposta del candidato. L’accettazione conclude il processo di selezione."
 }
