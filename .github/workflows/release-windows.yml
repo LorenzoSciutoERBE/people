@@ -1,4 +1,4 @@
-name: Release Windows
+name: Windows CI
 
 on:
   push:
@@ -10,40 +10,89 @@ permissions:
   contents: read
 
 concurrency:
-  group: windows-release-${{ github.ref }}
+  group: windows-ci
   cancel-in-progress: false
 
 jobs:
-  package:
-    runs-on: windows-2025
-    timeout-minutes: 60
+  version:
+    name: Increment patch version
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
     outputs:
       version: ${{ steps.version.outputs.version }}
+      commit: ${{ steps.version.outputs.commit }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.ref == 'refs/heads/master' && github.ref || github.sha }}
+      - name: Increment and record release version
+        id: version
+        shell: pwsh
+        env:
+          RELEASE_REF: ${{ github.ref }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          ./packaging/windows/Test-ReleaseVersion.ps1
+          $version = ./packaging/windows/Update-ReleaseVersion.ps1
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- pubspec.yaml README.md
+          git commit -m "Bump version to $version [skip ci]"
+          if ($LASTEXITCODE -ne 0) { throw 'Version commit failed.' }
+          if ($env:RELEASE_REF -eq 'refs/heads/master') {
+            git push origin HEAD:master
+            if ($LASTEXITCODE -ne 0) { throw 'Version push failed. Master may have changed; rerun the workflow.' }
+          }
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "commit=$(git rev-parse HEAD)" >> $env:GITHUB_OUTPUT
+      - name: Upload versioned source for manual runs outside master
+        if: github.ref != 'refs/heads/master'
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-version-files
+          path: |
+            pubspec.yaml
+            README.md
+
+  package:
+    name: Test, build, and verify Windows packages
+    needs: version
+    runs-on: windows-2025
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
+          ref: ${{ github.ref == 'refs/heads/master' && needs.version.outputs.commit || github.sha }}
+      - name: Download versioned files for manual runs outside master
+        if: github.ref != 'refs/heads/master'
+        uses: actions/download-artifact@v8
+        with:
+          name: release-version-files
+          path: .
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
           flutter-version: '3.47.8'
           cache: true
-      - name: Validate release version
-        id: version
+      - name: Set release version
         shell: pwsh
         run: |
-          $version = (Select-String -Path pubspec.yaml -Pattern '^version: (\d+\.\d+\.\d+)\+\d+$').Matches.Groups[1].Value
-          if (-not $version) { throw 'pubspec.yaml must contain a release version.' }
-          "RELEASE_VERSION=$version" >> $env:GITHUB_ENV
-          "version=$version" >> $env:GITHUB_OUTPUT
+          "RELEASE_VERSION=${{ needs.version.outputs.version }}" >> $env:GITHUB_ENV
       - name: Install required OCR capabilities
         shell: pwsh
         run: |
+          $ErrorActionPreference = 'Stop'
           foreach ($language in @('en-US', 'it-IT')) {
             $name = "Language.OCR~~~$language~0.0.1.0"
             if ((Get-WindowsCapability -Online -Name $name).State -ne 'Installed') {
               $result = Add-WindowsCapability -Online -Name $name
               if ($result.RestartNeeded) { throw "OCR installation requires a restart: $name" }
+            }
+            if ((Get-WindowsCapability -Online -Name $name).State -ne 'Installed') {
+              throw "Required Windows OCR capability is unavailable: $name"
             }
           }
       - name: Run release checks
@@ -54,7 +103,7 @@ jobs:
         run: ./packaging/windows/Install-InnoSetup.ps1
       - name: Build installer and portable ZIP
         shell: pwsh
-        run: ./Build-WindowsRelease.ps1 -Version $env:RELEASE_VERSION -BuildNumber ${{ github.run_number }} -InnoSetupCompiler ./build/release-tools/inno/ISCC.exe
+        run: ./Build-WindowsRelease.ps1 -Version $env:RELEASE_VERSION -BuildNumber 1 -InnoSetupCompiler ./build/release-tools/inno/ISCC.exe
       - name: Verify packaged distributions
         shell: pwsh
         run: ./packaging/windows/Test-WindowsPackages.ps1 -Version $env:RELEASE_VERSION
@@ -72,12 +121,14 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: release-test-results
-          path: build/test-results/
+          path: |
+            build/test-results/
+            coverage/lcov.info
           if-no-files-found: warn
 
   publish:
     if: github.ref == 'refs/heads/master'
-    needs: package
+    needs: [version, package]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -90,8 +141,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          RELEASE_TAG: v${{ needs.package.outputs.version }}-build.${{ github.run_number }}.${{ github.run_attempt }}
-          RELEASE_COMMIT: ${{ github.sha }}
+          RELEASE_TAG: v${{ needs.version.outputs.version }}
+          RELEASE_COMMIT: ${{ needs.version.outputs.commit }}
         run: |
           mapfile -d '' files < <(find release -type f -print0)
           gh release create "$RELEASE_TAG" "${files[@]}" --target "$RELEASE_COMMIT" --draft --generate-notes --title "People $RELEASE_TAG"
