@@ -38,18 +38,18 @@ class PipelineStatus extends StatelessWidget {
       'technical',
       'final',
     }.contains(candidate.stageId)) {
-      if (current?.scheduledAt == null) {
-        label = localization.pipelineSchedule;
-        icon = Icons.event_outlined;
-      } else if (current?.decision == FeedbackDecision.pending) {
-        final appointment = current!.scheduledAt!.toLocal();
-        final date = MaterialLocalizations.of(context)
-            .formatMediumDate(appointment);
-        final time = MaterialLocalizations.of(context)
-            .formatTimeOfDay(TimeOfDay.fromDateTime(appointment));
-        label =
-            '${localization.pipelineAwaitingFeedback} · $date $time · ${current.interviewer}';
-        icon = Icons.event_available_outlined;
+      if (current == null || current.decision == FeedbackDecision.pending) {
+        final details = <String>[localization.pipelineAwaitingFeedback];
+        if (current?.scheduledAt?.toLocal() case final appointment?) {
+          details.add(
+            '${MaterialLocalizations.of(context).formatMediumDate(appointment)} · ${MaterialLocalizations.of(context).formatTimeOfDay(TimeOfDay.fromDateTime(appointment))}',
+          );
+        }
+        if (current != null && current.interviewer.isNotEmpty) {
+          details.add(current.interviewer);
+        }
+        label = details.join(' · ');
+        icon = Icons.rate_review_outlined;
       } else {
         label = localization.pipelineFeedbackShared;
         icon = Icons.mark_email_read_outlined;

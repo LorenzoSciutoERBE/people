@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:convert';
+import 'dart:ui' show PointerDeviceKind;
 
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
@@ -60,7 +61,12 @@ Future<void> _waitUntilGone(WidgetTester tester, Finder finder) async {
   await tester.pumpAndSettle();
 }
 
-Future<void> _openActions(WidgetTester tester) async {
+Future<void> _openActions(WidgetTester tester, {bool openMenu = true}) async {
+  final close = find.byKey(const Key('candidate-details-close'));
+  if (close.evaluate().isNotEmpty) {
+    await tester.tap(close);
+    await _waitUntilGone(tester, close);
+  }
   final actions = find.byKey(
     const Key('candidate-actions-integration-candidate'),
   );
@@ -79,14 +85,55 @@ Future<void> _openActions(WidgetTester tester) async {
   await _waitFor(tester, actions);
   await tester.ensureVisible(actions);
   await tester.pumpAndSettle();
-  await tester.tap(actions);
-  await tester.pumpAndSettle();
+  if (openMenu) {
+    await tester.tap(actions);
+    await tester.pumpAndSettle();
+  }
 }
 
 Future<void> _openFeedback(WidgetTester tester) async {
-  await _openActions(tester);
-  await tester.tap(find.text('Interview & feedback'));
+  if (find.byKey(const Key('candidate-details-close')).evaluate().isEmpty) {
+    await _openActions(tester);
+    await tester.tap(find.text('Interview & feedback'));
+    await _waitFor(tester, find.byKey(const Key('candidate-details-close')));
+  }
+  final container = ProviderScope.containerOf(
+    tester.element(find.byKey(const Key('candidate-details-close'))),
+  );
+  final candidate = container
+      .read(candidateManagementControllerProvider)
+      .asData!
+      .value
+      .candidates
+      .firstWhere((candidate) => candidate.id == 'integration-candidate');
+  if (find
+      .byKey(ValueKey('feedback-step-${candidate.stageId}'))
+      .evaluate()
+      .isEmpty) {
+    await _openStep(tester, candidate.stageId);
+  }
+  final edit = find.byKey(const Key('selection-edit-step'));
+  if (edit.evaluate().isNotEmpty) {
+    await tester.ensureVisible(edit);
+    await tester.tap(edit);
+  }
   await _waitFor(tester, find.byKey(const Key('feedback-notes')));
+  expect(find.byType(Dialog), findsOneWidget);
+}
+
+Future<void> _openStep(WidgetTester tester, String stageId) async {
+  final eye = find.byKey(ValueKey('view-step-$stageId'));
+  await tester.ensureVisible(eye);
+  await tester.pumpAndSettle();
+  await tester.tap(eye);
+  await _waitFor(tester, find.byKey(ValueKey('feedback-step-$stageId')));
+}
+
+Future<void> _saveFeedback(WidgetTester tester) async {
+  final save = find.byKey(const Key('feedback-save'));
+  await tester.ensureVisible(save);
+  await tester.pumpAndSettle();
+  await tester.tap(save);
 }
 
 void registerCandidateWorkflowTests() {
@@ -183,33 +230,80 @@ void registerCandidateWorkflowTests() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('protects profile drafts while hiding personal details', (
+  testWidgets(
+    'keeps personal details visible while opening and closing step notes',
+    (tester) async {
+      await startApp(tester);
+      await tester.tap(find.text('Ada Lovelace'));
+      await _waitFor(tester, find.byKey(const Key('candidate-profile')));
+      expect(find.byKey(const Key('feedback-notes')), findsNothing);
+      expect(find.byKey(const Key('toggle-candidate-profile')), findsNothing);
+      final firstName = find.byWidgetPredicate(
+        (widget) =>
+            widget is TextField && widget.decoration?.labelText == 'First name',
+      );
+      await tester.enterText(firstName, 'Grace');
+      await _openStep(tester, 'new');
+      expect(tester.widget<TextField>(firstName).controller!.text, 'Grace');
+      expect(find.byKey(const Key('feedback-notes')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('close-step-notes')));
+      await _waitUntilGone(tester, find.byKey(const Key('feedback-notes')));
+      expect(tester.widget<TextField>(firstName).controller!.text, 'Grace');
+      await tester.tap(find.text('Save candidate'));
+      await tester.pumpAndSettle();
+      expect(
+        (await reopenRepository().load()).candidates.single.firstName,
+        'Grace',
+      );
+      expect(firstName, findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('discards stage drafts before saving another stage', (
     tester,
   ) async {
-    await startApp(tester);
-    await tester.tap(find.text('Ada Lovelace'));
-    await _waitFor(tester, find.byKey(const Key('toggle-candidate-profile')));
-    await tester.tap(find.byKey(const Key('toggle-candidate-profile')));
-    await tester.pumpAndSettle();
-    final firstName = find.byWidgetPredicate(
-      (widget) =>
-          widget is TextField && widget.decoration?.labelText == 'First name',
+    await repository.saveInterviewFeedback(
+      'integration-candidate',
+      stageId: 'new',
+      decision: FeedbackDecision.pending,
+      notes: 'Relevant CV.',
     );
-    await tester.enterText(firstName, 'Grace');
-    await tester.tap(find.byKey(const Key('toggle-candidate-profile')));
-    await _waitFor(tester, find.text('Keep editing'));
-    await tester.tap(find.text('Keep editing'));
-    await tester.pumpAndSettle();
-    expect(tester.widget<TextField>(firstName).controller!.text, 'Grace');
-    await tester.tap(find.text('Save candidate'));
+    await repository.moveCandidate('integration-candidate', 'screening');
+    await repository.saveInterviewFeedback(
+      'integration-candidate',
+      stageId: 'new',
+      decision: FeedbackDecision.pending,
+      notes: '',
+    );
+    await startApp(tester);
+    await _openFeedback(tester);
+    await tester.enterText(
+      find.byKey(const Key('feedback-notes')),
+      'Discard this interview draft.',
+    );
+    final previous = find.byKey(const Key('view-step-new'));
+    await tester.ensureVisible(previous);
+    await tester.tap(previous);
+    await _waitFor(tester, find.text('Discard changes'));
+    await tester.tap(find.text('Discard changes'));
     await tester.pumpAndSettle();
     expect(
-      (await reopenRepository().load()).candidates.single.firstName,
-      'Grace',
+      tester
+          .widget<TextField>(find.byKey(const Key('feedback-notes')))
+          .controller!
+          .text,
+      isEmpty,
     );
-    await tester.tap(find.byKey(const Key('toggle-candidate-profile')));
-    await tester.pumpAndSettle();
-    expect(firstName, findsNothing);
+    await tester.enterText(
+      find.byKey(const Key('feedback-notes')),
+      'Updated CV review.',
+    );
+    await _saveFeedback(tester);
+    await _waitUntilGone(tester, find.byKey(const Key('feedback-notes')));
+    final stored = (await reopenRepository().load()).candidates.single;
+    expect(stored.latestFeedbackFor('new')!.notes, 'Updated CV review.');
+    expect(stored.latestFeedbackFor('screening'), isNull);
     expect(tester.takeException(), isNull);
   });
 
@@ -414,7 +508,7 @@ void registerCandidateWorkflowTests() {
   );
 
   testWidgets(
-    'schedules every interview and tracks candidate communication before progression',
+    'saves interview feedback and progresses without scheduling or an author',
     (tester) async {
       await repository.saveInterviewFeedback(
         'integration-candidate',
@@ -431,61 +525,253 @@ void registerCandidateWorkflowTests() {
       ]) {
         await _openFeedback(tester);
         await tester.enterText(
-          find.byKey(const Key('interview-interviewer')),
-          'Owner for $stage',
-        );
-        await tester.tap(find.byKey(const Key('interview-schedule')));
-        await tester.pumpAndSettle();
-        await tester.tap(find.text('OK'));
-        await tester.pumpAndSettle();
-        await tester.tap(find.text('OK'));
-        await tester.pumpAndSettle();
-        await tester.tap(find.byKey(const Key('feedback-save')));
-        await _waitUntilGone(tester, find.byKey(const Key('feedback-notes')));
-        var stored = (await reopenRepository().load()).candidates.single
-            .latestFeedbackFor(stage)!;
-        expect(stored.scheduledAt, isNotNull);
-        expect(stored.interviewer, 'Owner for $stage');
-        expect(stored.decision, FeedbackDecision.pending);
-        await _openFeedback(tester);
-        await tester.enterText(
           find.byKey(const Key('feedback-notes')),
           'Strong interview.',
         );
         await tester.tap(find.byKey(const Key('feedback-decision-positive')));
         await tester.pumpAndSettle();
-        await tester.tap(find.byKey(const Key('feedback-save')));
+        await _saveFeedback(tester);
+        await _waitUntilGone(tester, find.byKey(const Key('feedback-notes')));
+        var stored = (await reopenRepository().load()).candidates.single
+            .latestFeedbackFor(stage)!;
+        expect(stored.scheduledAt, isNull);
+        expect(stored.interviewer, isEmpty);
+        expect(stored.decision, FeedbackDecision.positive);
+        expect(stored.notes, 'Strong interview.');
+        await _openFeedback(tester);
+        await tester.enterText(
+          find.byKey(const Key('feedback-notes')),
+          'Strong interview. Updated after saving.',
+        );
+        await tester.tap(find.byKey(const Key('feedback-decision-positive')));
+        await tester.pumpAndSettle();
+        await _saveFeedback(tester);
         await _waitUntilGone(tester, find.byKey(const Key('feedback-notes')));
         expect(find.text('Candidate feedback pending'), findsWidgets);
-        await _openActions(tester);
-        expect(find.text('Move to stage'), findsNothing);
-        await tester.tap(find.text('Interview & feedback'));
-        await _waitFor(
-          tester,
-          find.byKey(const Key('feedback-shared-with-candidate')),
-        );
-        await tester.tap(
-          find.byKey(const Key('feedback-shared-with-candidate')),
-        );
+        final communication = find.byKey(ValueKey('feedback-shared-$stage'));
+        await tester.ensureVisible(communication);
+        await tester.tap(communication);
         await tester.pumpAndSettle();
-        await tester.tap(find.byKey(const Key('feedback-save')));
-        await _waitUntilGone(tester, find.byKey(const Key('feedback-notes')));
-        await _openActions(tester);
-        await tester.tap(find.text('Move to stage'));
-        await tester.pumpAndSettle();
-        await tester.tap(find.byKey(ValueKey('candidate-move-$next')));
+        final advance = find.byKey(ValueKey('selection-advance-$next'));
+        await tester.ensureVisible(advance);
+        await tester.tap(advance);
         await tester.pumpAndSettle();
         stored = (await reopenRepository().load()).candidates.single
             .latestFeedbackFor(stage)!;
         expect(stored.feedbackSharedWithCandidate, isTrue);
+        expect(stored.scheduledAt, isNull);
+        expect(stored.interviewer, isEmpty);
         expect(
           (await reopenRepository().load()).candidates.single.stageId,
           next,
         );
       }
+      final previous = find.byKey(const Key('view-step-screening'));
+      await tester.ensureVisible(previous);
+      await tester.tap(previous);
+      await tester.pumpAndSettle();
+      expect(find.byType(Dialog), findsOneWidget);
+      expect(find.byType(ExpansionTile), findsNothing);
+      expect(
+        find.byKey(const Key('feedback-readonly-screening')),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('feedback-notes')), findsNothing);
+      await tester.tap(find.byKey(const Key('selection-edit-step')));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const Key('feedback-notes')),
+        'Updated previous interview feedback.',
+      );
+      await _saveFeedback(tester);
+      await _waitUntilGone(tester, find.byKey(const Key('feedback-notes')));
+      final reopened = (await reopenRepository().load()).candidates.single;
+      expect(reopened.stageId, 'offer');
+      expect(
+        reopened.latestFeedbackFor('screening')!.notes,
+        'Updated previous interview feedback.',
+      );
+      expect(
+        reopened.latestFeedbackFor('technical')!.notes,
+        'Strong interview. Updated after saving.',
+      );
+      await tester.tap(find.byKey(const Key('view-step-offer')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('feedback-step-offer')), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets('opens long step feedback by clicking the pipeline label', (
+    tester,
+  ) async {
+    final notes = List.generate(
+      80,
+      (index) =>
+          'Observation $index: clear reasoning and detailed interview feedback.',
+    ).join('\n');
+    await repository.saveInterviewFeedback(
+      'integration-candidate',
+      stageId: 'new',
+      decision: FeedbackDecision.pending,
+      notes: notes,
+    );
+    await repository.moveCandidate('integration-candidate', 'screening');
+    await repository.saveInterviewFeedback(
+      'integration-candidate',
+      stageId: 'screening',
+      decision: FeedbackDecision.pending,
+      notes: 'Current step notes.',
+    );
+    await startApp(tester);
+    await _openActions(tester);
+    await tester.tap(find.text('Interview & feedback'));
+    await _waitFor(tester, find.byKey(const Key('candidate-profile')));
+    expect(find.byKey(const Key('feedback-readonly-screening')), findsNothing);
+    expect(find.byKey(const Key('view-step-screening')), findsOneWidget);
+    final eye = find.byKey(const Key('view-step-new'));
+    await tester.ensureVisible(eye);
+    final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+    await mouse.addPointer(location: Offset.zero);
+    addTearDown(mouse.removePointer);
+    await mouse.moveTo(tester.getCenter(eye));
+    await tester.pump(const Duration(seconds: 1));
+    expect(find.byKey(const Key('step-feedback-preview')), findsNothing);
+    expect(find.text(notes), findsNothing);
+    expect(
+      find.descendant(
+        of: eye,
+        matching: find.byIcon(Icons.visibility_outlined),
+      ),
+      findsNothing,
+    );
+    await tester.tap(
+      find.descendant(of: eye, matching: find.text('CV review')),
+    );
+    await _waitFor(tester, find.byKey(const Key('feedback-readonly-new')));
+    expect(find.byKey(const Key('candidate-profile')), findsOneWidget);
+    expect(find.byKey(const Key('view-step-new')), findsNothing);
+    expect(find.byType(Dialog), findsOneWidget);
+    expect(
+      (await reopenRepository().load()).candidates.single.stageId,
+      'screening',
+    );
+    await _openStep(tester, 'screening');
+    await _waitFor(
+      tester,
+      find.byKey(const Key('feedback-readonly-screening')),
+    );
+    expect(find.byKey(const Key('view-step-screening')), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'shows compact pipeline dates from persisted interview and offer events',
+    (tester) async {
+      final cvDate = DateTime.utc(2026, 1, 3, 12);
+      final offerDate = DateTime.utc(2026, 1, 20, 12);
+      await repository.saveInterviewFeedback(
+        'integration-candidate',
+        stageId: 'new',
+        decision: FeedbackDecision.pending,
+        notes: 'Reviewed CV.',
+        recordedAt: cvDate,
+      );
+      await repository.moveCandidate('integration-candidate', 'screening');
+      for (final (stage, next, day) in [
+        ('screening', 'technical', 8),
+        ('technical', 'final', 10),
+        ('final', 'offer', 12),
+      ]) {
+        await repository.saveInterviewFeedback(
+          'integration-candidate',
+          stageId: stage,
+          decision: FeedbackDecision.positive,
+          notes: 'Proceed.',
+          scheduledAt: DateTime(2026, 1, day, 14),
+          recordedAt: DateTime.utc(2026, 1, 15, 12),
+          feedbackSharedWithCandidate: true,
+        );
+        await repository.moveCandidate('integration-candidate', next);
+      }
+      await repository.saveOffer(
+        'integration-candidate',
+        CandidateOffer(
+          status: OfferStatus.sent,
+          proposedStartDate: DateTime(2026, 6, 1),
+          recordedAt: offerDate,
+        ),
+      );
+      expect(
+        (await reopenRepository().load()).candidates.single.offer!.recordedAt,
+        offerDate,
+      );
+      await startApp(tester);
+      await _openActions(tester, openMenu: false);
+      await tester.tap(find.text('Ada Lovelace'));
+      await _waitFor(tester, find.byKey(const Key('candidate-profile')));
+      for (final (stage, date) in [
+        ('new', cvDate),
+        ('screening', DateTime(2026, 1, 8)),
+        ('technical', DateTime(2026, 1, 10)),
+        ('final', DateTime(2026, 1, 12)),
+        ('offer', offerDate),
+      ]) {
+        final caption = find.byKey(ValueKey('pipeline-date-$stage'));
+        final formatted = MaterialLocalizations.of(tester.element(caption))
+            .formatShortDate(date.toLocal());
+        expect(
+          find.descendant(of: caption, matching: find.text(formatted)),
+          findsOneWidget,
+        );
+      }
+      expect(find.byKey(const Key('feedback-notes')), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('updates half-star ratings and persists the candidate summary', (
+    tester,
+  ) async {
+    await startApp(tester);
+    await _openActions(tester);
+    await tester.tap(find.text('Interview & feedback'));
+    await _waitFor(tester, find.byKey(const Key('candidate-profile')));
+    expect(find.byKey(const Key('feedback-notes')), findsNothing);
+    expect(find.text('CURRENT STEP'), findsNothing);
+    expect(find.byKey(const Key('pipeline-outcome-pending')), findsOneWidget);
+    final technical = find.byKey(const Key('candidate-rating-technicalSkills'));
+    await tester.ensureVisible(technical);
+    await tester.pumpAndSettle();
+    final ratings = find.byKey(const Key('candidate-ratings-card'));
+    final rail = find.byKey(const Key('candidate-overview-scrollbar'));
+    expect(
+      tester.getRect(ratings).right,
+      lessThanOrEqualTo(tester.getRect(rail).right - 12),
+    );
+    await tester.tapAt(tester.getTopLeft(technical) + const Offset(110, 13));
+    await tester.pumpAndSettle();
+    expect(
+      (await reopenRepository().load()).candidates.single.ratings[RatingAspect
+          .technicalSkills],
+      4.5,
+    );
+    expect(find.text('4.5 / 5'), findsOneWidget);
+    expect(find.text('1 of 5 criteria rated'), findsOneWidget);
+    final communication = find.byKey(
+      const Key('candidate-rating-communication'),
+    );
+    await tester.ensureVisible(communication);
+    await tester.pumpAndSettle();
+    await tester.tapAt(tester.getTopLeft(communication) + const Offset(71, 13));
+    await tester.pumpAndSettle();
+    final stored = (await reopenRepository().load()).candidates.single;
+    expect(stored.ratings[RatingAspect.technicalSkills], 4.5);
+    expect(stored.ratings[RatingAspect.communication], 3);
+    expect(find.text('3.8 / 5'), findsOneWidget);
+    expect(find.text('2 of 5 criteria rated'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('edits long feedback and persists one record per stage', (
     tester,
@@ -500,7 +786,7 @@ void registerCandidateWorkflowTests() {
     await tester.enterText(find.byKey(const Key('feedback-notes')), notes);
 
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('feedback-save')));
+    await _saveFeedback(tester);
     await _waitUntilGone(tester, find.byKey(const Key('feedback-notes')));
     await _waitFor(
       tester,
@@ -520,7 +806,7 @@ void registerCandidateWorkflowTests() {
     );
 
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('feedback-save')));
+    await _saveFeedback(tester);
     await _waitUntilGone(tester, find.byKey(const Key('feedback-notes')));
     await _waitFor(
       tester,
@@ -532,11 +818,9 @@ void registerCandidateWorkflowTests() {
     expect(stored.interviews.single.notes, editedNotes);
     expect(stored.interviews.single.decision, FeedbackDecision.pending);
 
-    final candidateName = find.text('Ada Lovelace');
-    await tester.ensureVisible(candidateName);
-    await tester.pumpAndSettle();
-    await tester.tap(candidateName);
-    await _waitFor(tester, find.byKey(const Key('feedback-step-new')));
+    expect(find.byType(Dialog), findsOneWidget);
+    expect(find.byKey(const Key('selection-history')), findsNothing);
+    await tester.ensureVisible(find.byKey(const Key('selection-edit-step')));
     await tester.tap(find.byKey(const Key('selection-edit-step')));
     await _waitFor(tester, find.byKey(const Key('feedback-notes')));
     expect(
@@ -546,6 +830,23 @@ void registerCandidateWorkflowTests() {
           .text,
       editedNotes,
     );
+    final detailNotes = '$editedNotes\nSaved from the candidate record.';
+    await tester.enterText(
+      find.byKey(const Key('feedback-notes')),
+      detailNotes,
+    );
+    await tester.pumpAndSettle();
+    await _saveFeedback(tester);
+    await _waitUntilGone(tester, find.byKey(const Key('feedback-notes')));
+    final success = find.byKey(const Key('feedback-save-success'));
+    expect(success, findsOneWidget);
+    await tester.ensureVisible(success);
+    await tester.pumpAndSettle();
+    expect(success.hitTestable(), findsOneWidget);
+    expect(find.byType(SnackBar), findsNothing);
+    final reopened = (await reopenRepository().load()).candidates.single;
+    expect(reopened.interviews, hasLength(1));
+    expect(reopened.interviews.single.notes, detailNotes);
     expect(tester.takeException(), isNull);
   });
 
@@ -558,7 +859,7 @@ void registerCandidateWorkflowTests() {
       find.byKey(const Key('feedback-notes')),
       'These notes have not been saved.',
     );
-    await tester.tap(find.byKey(const Key('feedback-close')));
+    await tester.tap(find.byKey(const Key('candidate-details-close')));
     await _waitFor(tester, find.text('Unsaved changes'));
     await tester.tap(find.text('Keep editing'));
     await tester.pumpAndSettle();
@@ -569,7 +870,7 @@ void registerCandidateWorkflowTests() {
           .text,
       'These notes have not been saved.',
     );
-    await tester.tap(find.byKey(const Key('feedback-close')));
+    await tester.tap(find.byKey(const Key('candidate-details-close')));
     await _waitFor(tester, find.text('Discard changes'));
     await tester.tap(find.text('Discard changes'));
     await tester.pumpAndSettle();

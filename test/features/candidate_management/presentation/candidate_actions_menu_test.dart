@@ -14,7 +14,28 @@ class _Repository implements CandidateRepository {
   String? failure;
 
   @override
-  Future<RecruitingData> load() async => RecruitingData.initial();
+  Future<RecruitingData> load() async => RecruitingData.initial().copyWith(
+    candidates: [
+      Candidate(
+        id: 'c1',
+        firstName: 'Ada',
+        lastName: 'Lovelace',
+        stageId: 'new',
+        sourceId: 'grafton',
+        createdAt: DateTime(2026),
+        updatedAt: DateTime(2026),
+        interviews: [
+          InterviewRecord(
+            id: 'cv',
+            stageId: 'new',
+            createdAt: DateTime(2026),
+            decision: FeedbackDecision.pending,
+            notes: 'Relevant experience.',
+          ),
+        ],
+      ),
+    ],
+  );
 
   @override
   Future<void> moveCandidate(
@@ -93,18 +114,29 @@ void main() {
     expect(find.widgetWithText(TextField, 'Lovelace'), findsOneWidget);
   });
 
-  testWidgets('opens feedback directly without nesting a candidate dialog', (
-    tester,
-  ) async {
-    await _pumpMenu(tester, _Repository());
-    await tester.tap(find.byTooltip('Candidate actions'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Interview & feedback'));
-    await tester.pumpAndSettle();
-    expect(find.byType(Dialog), findsOneWidget);
-    expect(find.text('Interview notes'), findsOneWidget);
-    expect(find.text('Save candidate'), findsNothing);
-  });
+  testWidgets(
+    'opens saved feedback in the candidate screen without another dialog',
+    (tester) async {
+      await _pumpMenu(tester, _Repository());
+      await tester.tap(find.byTooltip('Candidate actions'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Interview & feedback'));
+      await tester.pumpAndSettle();
+      expect(find.byType(Dialog), findsOneWidget);
+      expect(find.byKey(const Key('candidate-profile')), findsOneWidget);
+      expect(find.byKey(const Key('feedback-readonly-new')), findsNothing);
+      await tester.ensureVisible(find.byKey(const Key('view-step-new')));
+      await tester.tap(find.byKey(const Key('view-step-new')));
+      await tester.pumpAndSettle();
+      expect(find.text('Interview notes'), findsOneWidget);
+      expect(
+        find.widgetWithText(TextField, 'Relevant experience.'),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('feedback-save')), findsNothing);
+      expect(find.text('Save candidate'), findsOneWidget);
+    },
+  );
 
   testWidgets('moves through the menu without dragging or skipping stages', (
     tester,

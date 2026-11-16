@@ -84,8 +84,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(Dialog), findsOneWidget);
-    // Personal details are hidden by default so the hiring process is in focus.
-    expect(find.byType(TextField), findsNothing);
+    // Profile details are always present; step notes require an explicit click.
+    expect(find.byKey(const Key('feedback-notes')), findsNothing);
     expect(find.byType(StarRating), findsWidgets);
     final container = ProviderScope.containerOf(
       tester.element(find.byType(CandidateDetailsPage)),
@@ -97,31 +97,24 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(StarRating), findsWidgets);
 
-    await tester.tap(find.byKey(const Key('toggle-candidate-profile')));
-    await tester.pumpAndSettle();
-
-    final firstName = find.byType(TextField).first;
+    final firstName = find.byWidgetPredicate(
+      (widget) =>
+          widget is TextField && widget.decoration?.labelText == 'First name',
+    );
+    expect(firstName, findsOneWidget);
     await tester.enterText(firstName, 'Grace');
-    await tester.pump();
-    await tester.tap(find.byKey(const Key('toggle-candidate-profile')));
     await tester.pumpAndSettle();
-    expect(find.text('Unsaved changes'), findsOneWidget);
-    await tester.tap(find.text('Keep editing'));
+    await tester.tap(find.byKey(const Key('view-step-new')));
     await tester.pumpAndSettle();
+    expect(find.byKey(const Key('feedback-notes')), findsOneWidget);
+    expect(tester.widget<TextField>(firstName).controller!.text, 'Grace');
+    await tester.tap(find.byKey(const Key('close-step-notes')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('feedback-notes')), findsNothing);
     expect(tester.widget<TextField>(firstName).controller!.text, 'Grace');
     await tester.tap(find.text('Save candidate'));
     await tester.pumpAndSettle();
     expect(repository.data.candidates.single.firstName, 'Grace');
-
-    await tester.enterText(firstName, 'Discarded draft');
-    await tester.tap(find.byKey(const Key('toggle-candidate-profile')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Discard changes'));
-    await tester.pumpAndSettle();
-    expect(find.byType(TextField), findsNothing);
-    await tester.tap(find.byKey(const Key('toggle-candidate-profile')));
-    await tester.pumpAndSettle();
-    expect(tester.widget<TextField>(firstName).controller!.text, 'Grace');
 
     await tester.enterText(firstName, '');
     await tester.pump();
@@ -147,13 +140,13 @@ void main() {
     );
     expect(repository.data.candidates.single.yearsOfExperience, isNull);
 
-    await tester.tap(find.byIcon(Icons.close));
+    await tester.tap(find.byKey(const Key('candidate-details-close')));
     await tester.pumpAndSettle();
     expect(find.text('Unsaved changes'), findsOneWidget);
     await tester.tap(find.text('Keep editing'));
     await tester.pumpAndSettle();
     expect(find.byType(Dialog), findsOneWidget);
-    await tester.tap(find.byIcon(Icons.close));
+    await tester.tap(find.byKey(const Key('candidate-details-close')));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Discard changes'));
     await tester.pumpAndSettle();

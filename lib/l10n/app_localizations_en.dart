@@ -179,11 +179,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get candidateMoveForwardBlocked =>
-      'Record positive interviewer feedback before advancing.';
+      'Record positive feedback before advancing.';
 
   @override
   String get candidateRejectBlocked =>
-      'Record negative interviewer feedback before rejecting.';
+      'Record negative feedback before rejecting.';
 
   @override
   String get candidateHireBlocked =>
@@ -502,6 +502,19 @@ class AppLocalizationsEn extends AppLocalizations {
   String get candidateAverageRating => 'Average rating';
 
   @override
+  String get candidateRatingNotRated => 'Not rated';
+
+  @override
+  String candidateRatingScore(String score) {
+    return '$score / 5';
+  }
+
+  @override
+  String candidateRatedCriteria(int rated, int total) {
+    return '$rated of $total criteria rated';
+  }
+
+  @override
   String get ratingTechnicalSkills => 'Technical skills';
 
   @override
@@ -782,14 +795,18 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get pipelineInterviewer => 'Interviewer / feedback owner';
+  String get pipelineInterviewer => 'Feedback author (optional)';
 
   @override
-  String get pipelineSchedule => 'Schedule interview';
+  String get pipelineSchedule => 'Add interview date (optional)';
 
   @override
-  String get pipelineScheduleRequired =>
-      'Schedule the interview and assign an interviewer before recording a decision.';
+  String get pipelineOptionalDetails => 'Optional interview details';
+
+  @override
+  String pipelineViewStep(String stage) {
+    return 'Open $stage';
+  }
 
   @override
   String get pipelineCvRequired =>
@@ -809,7 +826,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get pipelineReviewCv => 'Review CV and add initial notes';
 
   @override
-  String get pipelineAwaitingFeedback => 'Collect interviewer feedback';
+  String get pipelineAwaitingFeedback => 'Add feedback';
 
   @override
   String get pipelineReady => 'Ready for the next step';
@@ -824,6 +841,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get pipelineOutcome => 'OUTCOME';
 
   @override
+  String get pipelineOutcomeOptions => 'Hired or rejected';
+
+  @override
+  String pipelineStartDate(String date) {
+    return 'Start: $date';
+  }
+
+  @override
   String get pipelineCompletedSteps => 'Previous steps';
 
   @override
@@ -832,7 +857,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get pipelineInterviewDescription =>
-      'Schedule the conversation, collect the interviewer’s decision, and communicate the outcome to the candidate before continuing.';
+      'Save your notes and outcome. You can add the interview date and feedback author if useful.';
 
   @override
   String get pipelineOfferDescription =>

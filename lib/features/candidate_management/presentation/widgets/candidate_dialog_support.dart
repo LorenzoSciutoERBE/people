@@ -74,7 +74,6 @@ String candidateRepositoryErrorMessage(
   AppLocalizations localization,
   CandidateRepositoryException error,
 ) => switch (error.code) {
-  'interview_schedule_required' => localization.pipelineScheduleRequired,
   'cv_review_required' => localization.pipelineCvRequired,
   'candidate_feedback_required' => localization.pipelineCommunicationRequired,
   'positive_feedback_required' => localization.candidateMoveForwardBlocked,

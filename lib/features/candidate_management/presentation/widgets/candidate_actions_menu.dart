@@ -6,7 +6,7 @@ import '../../domain/entities/recruiting_data.dart';
 import '../providers/candidate_management_providers.dart';
 import 'candidate_dialog_support.dart';
 import 'candidate_editor_dialog.dart';
-import 'interview_feedback_form.dart';
+import 'candidate_details_page.dart';
 import 'offer_dialog.dart';
 import 'employment_plan_dialog.dart';
 
@@ -78,15 +78,7 @@ class CandidateActionsMenu extends ConsumerWidget {
               CandidateEditorDialog(data: data, candidate: candidate),
         );
       case 'feedback':
-        await showDialog<bool>(
-          context: context,
-          barrierDismissible: false,
-          builder: (_) => InterviewFeedbackDialog(
-            candidate: candidate,
-            stage: stage,
-            existing: candidate.latestFeedbackFor(stage.id),
-          ),
-        );
+        await CandidateDetailsPage.open(context, candidate.id);
       case 'move':
         final data = ref
             .read(candidateManagementControllerProvider)

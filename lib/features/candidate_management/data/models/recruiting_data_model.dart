@@ -205,6 +205,7 @@ class RecruitingDataModel {
         'contractType': value.contractType,
         'proposedStartDate': value.proposedStartDate?.toIso8601String(),
         'notes': value.notes,
+        'recordedAt': value.recordedAt?.toIso8601String(),
       };
 
   static CandidateOffer _decodeOffer(Map<String, Object?> json) =>
@@ -218,6 +219,9 @@ class RecruitingDataModel {
             ? null
             : DateTime.parse(_string(json, 'proposedStartDate')),
         notes: _string(json, 'notes'),
+        recordedAt: json['recordedAt'] == null
+            ? null
+            : DateTime.parse(_string(json, 'recordedAt')),
       );
 
   static Map<String, Object?> _encodeSource(CandidateSource value) =>

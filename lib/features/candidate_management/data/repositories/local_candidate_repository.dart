@@ -196,12 +196,6 @@ class LocalCandidateRepository implements CandidateRepository {
     if (stageId == 'new' && decision != FeedbackDecision.pending) {
       throw const CandidateRepositoryException('feedback_not_allowed');
     }
-    if (stageId != 'new' &&
-        decision != FeedbackDecision.pending &&
-        ((scheduledAt ?? existing?.scheduledAt) == null ||
-            (interviewer ?? existing?.interviewer ?? '').trim().isEmpty)) {
-      throw const CandidateRepositoryException('interview_schedule_required');
-    }
     final shared =
         decision != FeedbackDecision.pending &&
         (feedbackSharedWithCandidate ??
@@ -327,9 +321,21 @@ class LocalCandidateRepository implements CandidateRepository {
         if (!stage.isOfferStage) {
           throw const CandidateRepositoryException('offer_stage_required');
         }
+        final now = DateTime.now().toUtc();
+        final stored = CandidateOffer(
+          status: offer.status,
+          position: offer.position,
+          salary: offer.salary,
+          currency: offer.currency,
+          contractType: offer.contractType,
+          proposedStartDate: offer.proposedStartDate,
+          notes: offer.notes,
+          recordedAt:
+              candidate.offer?.recordedAt ?? offer.recordedAt?.toUtc() ?? now,
+        );
         await _replaceCandidate(
           data,
-          candidate.copyWith(offer: offer, updatedAt: DateTime.now().toUtc()),
+          candidate.copyWith(offer: stored, updatedAt: now),
         );
       });
 

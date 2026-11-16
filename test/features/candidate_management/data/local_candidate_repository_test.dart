@@ -73,6 +73,62 @@ void main() {
     },
   );
 
+  for (final decision in FeedbackDecision.values) {
+    test(
+      'persists $decision feedback without scheduling or an author',
+      () async {
+        final repository = createRepository();
+        final candidate = _candidate('optional-details');
+        await repository.saveCandidate(candidate);
+        await repository.saveInterviewFeedback(
+          candidate.id,
+          stageId: 'new',
+          decision: FeedbackDecision.pending,
+          notes: 'Relevant CV.',
+        );
+        await repository.moveCandidate(candidate.id, 'screening');
+        await repository.saveInterviewFeedback(
+          candidate.id,
+          stageId: 'screening',
+          decision: decision,
+          notes: 'Interview notes.',
+        );
+        final stored = (await createRepository().load()).candidates.single
+            .latestFeedbackFor('screening')!;
+        expect(stored.decision, decision);
+        expect(stored.notes, 'Interview notes.');
+        expect(stored.scheduledAt, isNull);
+        expect(stored.interviewer, isEmpty);
+      },
+    );
+  }
+
+  test(
+    'reads legacy offers without dates and rejects malformed offer dates',
+    () {
+      final encoded = RecruitingDataModel.encode(
+        RecruitingData.initial().copyWith(
+          candidates: [
+            _candidate(
+              'legacy-offer',
+            ).copyWith(offer: const CandidateOffer(status: OfferStatus.sent)),
+          ],
+        ),
+      );
+      final candidate =
+          (encoded['candidates']! as List<Object?>).single!
+              as Map<String, Object?>;
+      final offer = candidate['offer']! as Map<String, Object?>;
+      offer.remove('recordedAt');
+      expect(
+        RecruitingDataModel.decode(encoded).candidates.single.offer!.recordedAt,
+        isNull,
+      );
+      offer['recordedAt'] = 'invalid-date';
+      expect(() => RecruitingDataModel.decode(encoded), throwsFormatException);
+    },
+  );
+
   test(
     'completes interviews only after a decision and candidate communication',
     () async {
@@ -133,6 +189,21 @@ void main() {
       await repository.saveOffer(
         candidate.id,
         const CandidateOffer(status: OfferStatus.accepted),
+      );
+      final offerDate =
+          (await createRepository().load()).candidates.single.offer!.recordedAt;
+      expect(offerDate, isNotNull);
+      await repository.saveOffer(
+        candidate.id,
+        CandidateOffer(
+          status: OfferStatus.accepted,
+          position: 'Engineer',
+          recordedAt: DateTime.utc(2000),
+        ),
+      );
+      expect(
+        (await createRepository().load()).candidates.single.offer!.recordedAt,
+        offerDate,
       );
       await repository.moveCandidate(candidate.id, 'hired');
       final reopened = (await createRepository().load()).candidates.single;

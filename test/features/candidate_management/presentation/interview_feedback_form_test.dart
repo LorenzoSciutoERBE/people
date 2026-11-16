@@ -11,6 +11,8 @@ class _RecordingRepository implements CandidateRepository {
   FeedbackDecision? savedDecision;
   DateTime? savedRecordedAt;
   bool? savedSharedWithCandidate;
+  String? savedInterviewer;
+  DateTime? savedScheduledAt;
   bool failReload = false;
 
   @override
@@ -35,10 +37,12 @@ class _RecordingRepository implements CandidateRepository {
     savedDecision = decision;
     savedRecordedAt = recordedAt;
     savedSharedWithCandidate = feedbackSharedWithCandidate;
+    savedInterviewer = interviewer;
+    savedScheduledAt = scheduledAt;
   }
 
   @override
-  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+  Object? noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
 void main() {
@@ -105,6 +109,8 @@ void main() {
       expect(repository.savedRecordedAt, isNotNull);
       expect(saved, !failReload);
       if (failReload) {
+        expect(find.byKey(const Key('feedback-save-error')), findsOneWidget);
+        expect(find.byType(SnackBar), findsNothing);
         expect(
           find.text('Keep this draft if refreshing fails.'),
           findsOneWidget,
@@ -191,6 +197,7 @@ void main() {
     expect(repository.savedRecordedAt?.year, 2026);
     expect(repository.savedRecordedAt?.month, 3);
     expect(repository.savedRecordedAt?.day, 10);
+    expect(repository.savedDecision, FeedbackDecision.pending);
   });
 
   testWidgets('allows marking positive and negative feedback as communicated', (
@@ -249,6 +256,8 @@ void main() {
       find.byKey(const Key('feedback-shared-with-candidate')),
       findsNothing,
     );
+    expect(find.byKey(const Key('interview-interviewer')), findsNothing);
+    expect(find.byKey(const Key('interview-schedule')), findsNothing);
 
     await tester.tap(find.text('Negative'));
     await tester.pumpAndSettle();
@@ -263,6 +272,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(repository.savedDecision, FeedbackDecision.negative);
+    expect(find.byKey(const Key('feedback-save-error')), findsNothing);
     expect(repository.savedSharedWithCandidate, isTrue);
     await tester.tap(find.text('Positive'));
     await tester.pumpAndSettle();
@@ -272,5 +282,20 @@ void main() {
     await tester.pumpAndSettle();
     expect(repository.savedDecision, FeedbackDecision.positive);
     expect(repository.savedSharedWithCandidate, isTrue);
+    expect(repository.savedInterviewer, isEmpty);
+    expect(repository.savedScheduledAt, isNull);
+
+    final optionalDetails = find.byKey(const Key('feedback-optional-details'));
+    await tester.ensureVisible(optionalDetails);
+    await tester.tap(optionalDetails);
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('interview-interviewer')),
+      'Feedback author',
+    );
+    await tester.tap(find.byKey(const Key('feedback-save')));
+    await tester.pumpAndSettle();
+    expect(repository.savedInterviewer, 'Feedback author');
+    expect(repository.savedScheduledAt, isNull);
   });
 }

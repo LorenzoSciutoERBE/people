@@ -507,6 +507,19 @@ class AppLocalizationsIt extends AppLocalizations {
   String get candidateAverageRating => 'Voto medio';
 
   @override
+  String get candidateRatingNotRated => 'Da valutare';
+
+  @override
+  String candidateRatingScore(String score) {
+    return '$score / 5';
+  }
+
+  @override
+  String candidateRatedCriteria(int rated, int total) {
+    return '$rated criteri valutati su $total';
+  }
+
+  @override
   String get ratingTechnicalSkills => 'Competenze tecniche';
 
   @override
@@ -789,14 +802,18 @@ class AppLocalizationsIt extends AppLocalizations {
   }
 
   @override
-  String get pipelineInterviewer => 'Intervistatore / responsabile feedback';
+  String get pipelineInterviewer => 'Autore del feedback (facoltativo)';
 
   @override
-  String get pipelineSchedule => 'Pianifica colloquio';
+  String get pipelineSchedule => 'Aggiungi data del colloquio (facoltativa)';
 
   @override
-  String get pipelineScheduleRequired =>
-      'Pianifica il colloquio e assegna un intervistatore prima di registrare una decisione.';
+  String get pipelineOptionalDetails => 'Dettagli facoltativi del colloquio';
+
+  @override
+  String pipelineViewStep(String stage) {
+    return 'Apri $stage';
+  }
 
   @override
   String get pipelineCvRequired =>
@@ -816,8 +833,7 @@ class AppLocalizationsIt extends AppLocalizations {
   String get pipelineReviewCv => 'Rivedi il CV e aggiungi le prime note';
 
   @override
-  String get pipelineAwaitingFeedback =>
-      'Raccogli il feedback dell’intervistatore';
+  String get pipelineAwaitingFeedback => 'Aggiungi feedback';
 
   @override
   String get pipelineReady => 'Pronto per il prossimo step';
@@ -832,6 +848,14 @@ class AppLocalizationsIt extends AppLocalizations {
   String get pipelineOutcome => 'ESITO';
 
   @override
+  String get pipelineOutcomeOptions => 'Assunto o rifiutato';
+
+  @override
+  String pipelineStartDate(String date) {
+    return 'Inizio: $date';
+  }
+
+  @override
   String get pipelineCompletedSteps => 'Fasi precedenti';
 
   @override
@@ -840,7 +864,7 @@ class AppLocalizationsIt extends AppLocalizations {
 
   @override
   String get pipelineInterviewDescription =>
-      'Pianifica il colloquio, raccogli la decisione dell’intervistatore e comunica l’esito al candidato prima di proseguire.';
+      'Salva note ed esito. Se ti servono, puoi aggiungere la data del colloquio e l’autore del feedback.';
 
   @override
   String get pipelineOfferDescription =>

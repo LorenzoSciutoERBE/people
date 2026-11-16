@@ -54,74 +54,103 @@ class _Repository implements CandidateRepository {
 }
 
 void main() {
-  testWidgets(
-    'current step has one communication action and unlocks progression when shared',
-    (tester) async {
-      tester.view.physicalSize = const Size(1600, 1000);
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.reset);
-      final initial = RecruitingData.initial();
-      final candidate = Candidate(
-        id: 'selection',
-        firstName: 'Ada',
-        lastName: 'Lovelace',
-        stageId: 'technical',
-        sourceId: 'grafton',
-        createdAt: DateTime.utc(2026),
-        updatedAt: DateTime.utc(2026),
-        interviews: [
-          InterviewRecord(
-            id: 'cv',
-            stageId: 'new',
-            createdAt: DateTime.utc(2026),
-            decision: FeedbackDecision.pending,
-            notes: 'Relevant CV.',
-          ),
-          InterviewRecord(
-            id: 'technical',
-            stageId: 'technical',
-            createdAt: DateTime.utc(2026),
-            decision: FeedbackDecision.positive,
-            notes: 'Strong systems thinking.',
-            scheduledAt: DateTime.utc(2026, 11, 12, 14),
-            interviewer: 'Technical interviewer',
-          ),
-        ],
-      );
-      final repository = _Repository(initial.copyWith(candidates: [candidate]));
-      await tester.pumpWidget(
-        ProviderScope(
-          overrides: [
-            candidateRepositoryProvider.overrideWith((ref) async => repository),
+  for (final hasSchedule in [true, false]) {
+    testWidgets(
+      'current step unlocks progression with optional scheduling: $hasSchedule',
+      (tester) async {
+        tester.view.physicalSize = const Size(1600, 1000);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        final initial = RecruitingData.initial();
+        final candidate = Candidate(
+          id: 'selection',
+          firstName: 'Ada',
+          lastName: 'Lovelace',
+          stageId: 'technical',
+          sourceId: 'grafton',
+          createdAt: DateTime.utc(2026),
+          updatedAt: DateTime.utc(2026),
+          interviews: [
+            InterviewRecord(
+              id: 'cv',
+              stageId: 'new',
+              createdAt: DateTime.utc(2026),
+              decision: FeedbackDecision.pending,
+              notes: 'Relevant CV.',
+            ),
+            InterviewRecord(
+              id: 'technical',
+              stageId: 'technical',
+              createdAt: DateTime.utc(2026),
+              decision: FeedbackDecision.positive,
+              notes: 'Strong systems thinking.',
+              scheduledAt: hasSchedule ? DateTime.utc(2026, 11, 12, 14) : null,
+              interviewer: hasSchedule ? 'Technical interviewer' : '',
+            ),
           ],
-          child: MaterialApp(
-            localizationsDelegates: AppLocalizations.localizationsDelegates,
-            supportedLocales: AppLocalizations.supportedLocales,
-            home: const Scaffold(
-              body: CandidateDetailsPage(candidateId: 'selection'),
+        );
+        final repository = _Repository(
+          initial.copyWith(candidates: [candidate]),
+        );
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              candidateRepositoryProvider.overrideWith(
+                (ref) async => repository,
+              ),
+            ],
+            child: MaterialApp(
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              home: const Scaffold(
+                body: CandidateDetailsPage(candidateId: 'selection'),
+              ),
             ),
           ),
-        ),
-      );
-      await tester.pumpAndSettle();
-      expect(find.text('CURRENT STEP'), findsOneWidget);
-      expect(find.text('Technical interviewer'), findsOneWidget);
-      expect(find.byKey(const Key('selection-advance-final')), findsNothing);
-      final communication = find.byKey(const Key('feedback-shared-technical'));
-      expect(communication, findsOneWidget);
-      await tester.tap(communication);
-      await tester.pumpAndSettle();
-      expect(
-        repository.data.candidates.single
-            .latestFeedbackFor('technical')!
-            .feedbackSharedWithCandidate,
-        isTrue,
-      );
-      expect(find.byKey(const Key('selection-advance-final')), findsOneWidget);
-      expect(find.byKey(const Key('selection-advance-rejected')), findsNothing);
-      tester.view.physicalSize = const Size(850, 650);
-      await tester.pumpAndSettle();
-      expect(tester.takeException(), isNull);
-    },
-  );
+        );
+        await tester.pumpAndSettle();
+        await tester.ensureVisible(
+          find.byKey(const Key('view-step-technical')),
+        );
+        await tester.tap(find.byKey(const Key('view-step-technical')));
+        await tester.pumpAndSettle();
+        expect(find.text('CURRENT STEP'), findsNothing);
+        expect(
+          find.byKey(const Key('pipeline-outcome-pending')),
+          findsOneWidget,
+        );
+        expect(
+          find.text('Technical interviewer'),
+          hasSchedule ? findsOneWidget : findsNothing,
+        );
+        expect(find.byKey(const Key('selection-advance-final')), findsNothing);
+        final communication = find.byKey(
+          const Key('feedback-shared-technical'),
+        );
+        expect(communication, findsOneWidget);
+        await tester.tap(communication);
+        await tester.pumpAndSettle();
+        expect(
+          repository.data.candidates.single
+              .latestFeedbackFor('technical')!
+              .feedbackSharedWithCandidate,
+          isTrue,
+        );
+        expect(
+          find.byKey(const Key('selection-advance-final')),
+          findsOneWidget,
+        );
+        expect(find.text('Candidate feedback shared'), findsWidgets);
+        expect(find.text('Add feedback'), findsNothing);
+        expect(find.text('Add interview date (optional)'), findsNothing);
+        expect(
+          find.byKey(const Key('selection-advance-rejected')),
+          findsNothing,
+        );
+        tester.view.physicalSize = const Size(850, 650);
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
 }

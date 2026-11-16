@@ -2,8 +2,8 @@ name: Release Windows
 
 on:
   push:
-    tags:
-      - 'v*.*.*'
+    branches:
+      - master
   workflow_dispatch:
 
 permissions:
@@ -17,6 +17,8 @@ jobs:
   package:
     runs-on: windows-2025
     timeout-minutes: 60
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -27,16 +29,13 @@ jobs:
           flutter-version: '3.47.8'
           cache: true
       - name: Validate release version
+        id: version
         shell: pwsh
-        env:
-          RELEASE_REF: ${{ github.ref }}
         run: |
           $version = (Select-String -Path pubspec.yaml -Pattern '^version: (\d+\.\d+\.\d+)\+\d+$').Matches.Groups[1].Value
           if (-not $version) { throw 'pubspec.yaml must contain a release version.' }
-          if ($env:RELEASE_REF.StartsWith('refs/tags/') -and $env:RELEASE_REF -ne "refs/tags/v$version") {
-            throw 'The release tag must match the version in pubspec.yaml.'
-          }
           "RELEASE_VERSION=$version" >> $env:GITHUB_ENV
+          "version=$version" >> $env:GITHUB_OUTPUT
       - name: Install required OCR capabilities
         shell: pwsh
         run: |
@@ -77,7 +76,7 @@ jobs:
           if-no-files-found: warn
 
   publish:
-    if: startsWith(github.ref, 'refs/tags/')
+    if: github.ref == 'refs/heads/master'
     needs: package
     runs-on: ubuntu-latest
     permissions:
@@ -91,7 +90,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_TAG: v${{ needs.package.outputs.version }}-build.${{ github.run_number }}.${{ github.run_attempt }}
+          RELEASE_COMMIT: ${{ github.sha }}
         run: |
           mapfile -d '' files < <(find release -type f -print0)
-          gh release create "$RELEASE_TAG" "${files[@]}" --verify-tag --draft --generate-notes --title "People $RELEASE_TAG"
+          gh release create "$RELEASE_TAG" "${files[@]}" --target "$RELEASE_COMMIT" --draft --generate-notes --title "People $RELEASE_TAG"
